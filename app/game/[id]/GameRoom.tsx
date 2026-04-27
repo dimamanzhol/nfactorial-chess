@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Chess, type Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { supabase } from "@/lib/supabase";
-import { getRandomProblem, submitMove, skipTurn, runPyTests } from "@/lib/game";
+import { getRandomProblem, submitMove, skipTurn, runPyTests, recordTurn } from "@/lib/game";
+import { getPlayerId } from "@/lib/supabase";
 import type { Game, Problem, Color } from "@/types";
 import CodeEditor from "@/components/CodeEditor";
 
@@ -48,19 +49,26 @@ function ProblemPanel({
 }: {
   problem: Problem;
   moveAttempted: string;
-  onSolved: () => void;
-  onFailed: () => void;
+  onSolved: (code: string, timeTakenMs: number) => void;
+  onFailed: (code: string, timeTakenMs: number) => void;
 }) {
   const [code, setCode] = useState(problem.starter_code["python"] ?? "");
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<{ passed: boolean; message: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef(Date.now());
+  const codeRef = useRef(code);
+  codeRef.current = code;
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(timerRef.current!); onFailed(); return 0; }
+        if (t <= 1) {
+          clearInterval(timerRef.current!);
+          onFailed(codeRef.current, Date.now() - startTimeRef.current);
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -74,7 +82,8 @@ function ProblemPanel({
     if (result.passed) {
       setOutput({ passed: true, message: "All test cases passed!" });
       clearInterval(timerRef.current!);
-      setTimeout(onSolved, 600);
+      const elapsed = Date.now() - startTimeRef.current;
+      setTimeout(() => onSolved(code, elapsed), 600);
     } else if (result.failedCase) {
       const { input, expected, got } = result.failedCase;
       setOutput({ passed: false, message: `Input: ${JSON.stringify(input)} → got ${JSON.stringify(got)}, expected ${JSON.stringify(expected)}` });
@@ -189,7 +198,7 @@ function ProblemPanel({
             {running ? "Running…" : "Run & Submit"}
           </button>
           <button
-            onClick={onFailed}
+            onClick={() => onFailed(codeRef.current, Date.now() - startTimeRef.current)}
             style={{
               padding: "10px 14px",
               background: "transparent", color: T.textMut,
@@ -333,6 +342,8 @@ export default function GameRoom({ gameId }: { gameId: string }) {
   const [gameOver, setGameOver] = useState<{ winner: string | null; reason: string } | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
   const boardRef = useRef<HTMLDivElement>(null);
+  const turnNumberRef = useRef(myColor === "white" ? 1 : 2);
+  const playerIdRef = useRef<string>("");
 
   useEffect(() => {
     function measure() {
@@ -344,6 +355,10 @@ export default function GameRoom({ gameId }: { gameId: string }) {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  useEffect(() => {
+    getPlayerId().then((id) => { playerIdRef.current = id; });
   }, []);
 
   useEffect(() => {
@@ -414,8 +429,9 @@ export default function GameRoom({ gameId }: { gameId: string }) {
     setActiveProblem(prob);
   }
 
-  const handleProblemSolved = useCallback(async () => {
+  const handleProblemSolved = useCallback(async (code: string, timeTakenMs: number) => {
     if (!pendingMove || !game) return;
+    const prob = activeProblem;
     setActiveProblem(null);
     const { from, to } = pendingMove;
     setPendingMove(null);
@@ -427,20 +443,54 @@ export default function GameRoom({ gameId }: { gameId: string }) {
       const isOver = chess.isGameOver();
       const winner = chess.isCheckmate() ? myColor : null;
       await submitMove(gameId, newFen, result.san, myColor, isOver ? winner : undefined);
+      if (prob) {
+        await recordTurn({
+          gameId,
+          turnNumber: turnNumberRef.current,
+          playerColor: myColor,
+          playerId: playerIdRef.current,
+          problemId: prob.id,
+          moveAttempted: `${from} → ${to}`,
+          moveMade: result.san,
+          codeSubmitted: code,
+          language: "python",
+          solved: true,
+          timeTakenMs,
+        });
+        turnNumberRef.current += 2; // each player increments by 2 (white=odd, black=even)
+      }
       if (isOver) setGameOver({ winner, reason: chess.isCheckmate() ? "checkmate" : "draw" });
       else setStatusMsg("Move played — waiting for opponent.");
     } catch { setStatusMsg("Move failed."); }
-  }, [pendingMove, game, chess, myColor, gameId]);
+  }, [pendingMove, game, activeProblem, chess, myColor, gameId]);
 
-  const handleProblemFailed = useCallback(async () => {
+  const handleProblemFailed = useCallback(async (code: string, timeTakenMs: number) => {
     if (!game) return;
+    const prob = activeProblem;
+    const move = pendingMove;
     setActiveProblem(null);
     setPendingMove(null);
     clearSelection();
     await skipTurn(gameId, myColor);
+    if (prob) {
+      await recordTurn({
+        gameId,
+        turnNumber: turnNumberRef.current,
+        playerColor: myColor,
+        playerId: playerIdRef.current,
+        problemId: prob.id,
+        moveAttempted: move ? `${move.from} → ${move.to}` : null,
+        moveMade: null,
+        codeSubmitted: code,
+        language: "python",
+        solved: false,
+        timeTakenMs,
+      });
+      turnNumberRef.current += 2;
+    }
     setStatusMsg("Turn skipped — opponent's move.");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, gameId, myColor]);
+  }, [game, activeProblem, gameId, myColor]);
 
   let turnStatus = "";
   if (game?.status === "waiting") turnStatus = "Waiting for opponent to join…";

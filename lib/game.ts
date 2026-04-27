@@ -96,6 +96,36 @@ export async function skipTurn(
   if (error) throw new Error(error.message);
 }
 
+export async function recordTurn(params: {
+  gameId: string;
+  turnNumber: number;
+  playerColor: "white" | "black";
+  playerId: string;
+  problemId: string;
+  moveAttempted: string | null;
+  moveMade: string | null;
+  codeSubmitted: string | null;
+  language: string;
+  solved: boolean;
+  timeTakenMs: number;
+}): Promise<void> {
+  const { error } = await supabase.from("turns").insert({
+    game_id: params.gameId,
+    turn_number: params.turnNumber,
+    player_color: params.playerColor,
+    player_id: params.playerId,
+    problem_id: params.problemId,
+    move_attempted: params.moveAttempted,
+    move_made: params.moveMade,
+    code_submitted: params.codeSubmitted,
+    language: params.language,
+    solved: params.solved,
+    time_taken_ms: params.timeTakenMs,
+    completed_at: new Date().toISOString(),
+  });
+  if (error) console.error("recordTurn error:", error.message);
+}
+
 /**
  * Run Python code against test cases using Pyodide (in-browser WASM).
  * Expects the code to define a function; calls it with each test case's args.

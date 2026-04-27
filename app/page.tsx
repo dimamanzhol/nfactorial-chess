@@ -82,6 +82,12 @@ export default function HomePage() {
         </span>
         {user ? (
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <a
+              href="/history"
+              style={{ fontSize: 13, color: T.textSec, textDecoration: "none" }}
+            >
+              History
+            </a>
             <span style={{ fontSize: 13, color: T.textSec }}>{user.email}</span>
             <button
               onClick={handleSignOut}
