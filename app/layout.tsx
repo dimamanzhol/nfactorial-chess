@@ -27,6 +27,23 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full`}>
+      <head>
+        {/* Pyodide — Python in the browser via WebAssembly */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined') {
+                var s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.4/full/pyodide.js';
+                s.onload = function() {
+                  window.__pyodidePromise = loadPyodide();
+                };
+                document.head.appendChild(s);
+              }
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

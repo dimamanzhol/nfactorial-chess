@@ -97,32 +97,35 @@ export async function skipTurn(
 }
 
 /**
- * Run JavaScript code against test cases in-browser.
- * Extracts the function name from code and executes it with each test case's args.
+ * Run Python code against test cases using Pyodide (in-browser WASM).
+ * Expects the code to define a function; calls it with each test case's args.
  */
-export function runJSTests(
+export async function runPyTests(
   code: string,
   testCases: Array<{ input: Record<string, unknown>; expected: unknown }>
-): {
+): Promise<{
   passed: boolean;
   failedCase?: { input: unknown; expected: unknown; got: unknown };
-} {
+}> {
   try {
-    const fnMatch = code.match(/function\s+(\w+)\s*\(/);
+    // @ts-expect-error — Pyodide loaded via CDN script tag
+    const pyodide = await window.__pyodidePromise;
+
+    // Extract function name from def statement
+    const fnMatch = code.match(/^def\s+(\w+)\s*\(/m);
     if (!fnMatch) return { passed: false };
     const fnName = fnMatch[1];
 
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(`${code}\nreturn ${fnName};`)() as (...args: unknown[]) => unknown;
+    await pyodide.runPythonAsync(code);
+    const fn = pyodide.globals.get(fnName);
 
     for (const tc of testCases) {
       const args = Object.values(tc.input);
       const result = fn(...args);
-      if (JSON.stringify(result) !== JSON.stringify(tc.expected)) {
-        return {
-          passed: false,
-          failedCase: { input: tc.input, expected: tc.expected, got: result },
-        };
+      // Convert Pyodide proxy to JS value if needed
+      const got = result?.toJs ? result.toJs({ dict_converter: Object.fromEntries }) : result;
+      if (JSON.stringify(got) !== JSON.stringify(tc.expected)) {
+        return { passed: false, failedCase: { input: tc.input, expected: tc.expected, got } };
       }
     }
     return { passed: true };

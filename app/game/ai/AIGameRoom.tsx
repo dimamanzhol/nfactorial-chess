@@ -3,22 +3,25 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Chess, type Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
-import { getRandomProblem, runJSTests } from "@/lib/game";
+import { getRandomProblem, runPyTests } from "@/lib/game";
 import type { Problem } from "@/types";
+import CodeEditor from "@/components/CodeEditor";
 
 // ─── Design tokens ────────────────────────────────────────────────────────
 const T = {
-  bg: "#0a0a0f",
-  bgSec: "#111118",
-  bgCard: "#16161f",
-  border: "#2a2a3a",
-  accent: "#4f8ef7",
-  green: "#22c55e",
-  red: "#ef4444",
-  yellow: "#f59e0b",
-  textPri: "#f0f0f8",
-  textSec: "#9090a8",
-  textMut: "#55556a",
+  bg: "#f7f3ee",
+  bgAlt: "#efebe4",
+  surface: "#ffffff",
+  text: "#0f0f0d",
+  textSec: "#6e6e62",
+  textMut: "#9e9e92",
+  border: "#e5e1d8",
+  editorBg: "#f7f3ee",
+  editorText: "#0f0f0d",
+  editorBorder: "#e5e1d8",
+  green: "#16a34a",
+  red: "#dc2626",
+  yellow: "#b45309",
 };
 
 const DIFF_COLOR: Record<string, string> = {
@@ -29,245 +32,236 @@ const DIFF_COLOR: Record<string, string> = {
 
 const TIMER_SECONDS = 180;
 
-// Piece values for AI move scoring
 const PIECE_VALUE: Record<string, number> = {
   p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
 };
 
-/** Pick the best move for the AI using greedy evaluation. */
+function fmt(s: number) {
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
 function pickAIMove(chess: Chess): string | null {
   const moves = chess.moves({ verbose: true });
   if (!moves.length) return null;
-
-  // 1. Checkmate immediately
   for (const m of moves) {
     chess.move(m.san);
     if (chess.isCheckmate()) { chess.undo(); return m.san; }
     chess.undo();
   }
-
-  // 2. Score each move: capture value + check bonus
   const scored = moves.map((m) => {
     let score = 0;
     if (m.captured) score += PIECE_VALUE[m.captured] * 10;
     chess.move(m.san);
     if (chess.inCheck()) score += 3;
-    // Don't hang pieces (very rough: avoid moving to attacked squares with valuable piece)
     chess.undo();
-    score += Math.random() * 0.5; // tiebreak
+    score += Math.random() * 0.5;
     return { move: m.san, score };
   });
-
   scored.sort((a, b) => b.score - a.score);
   return scored[0].move;
 }
 
-// ─── Problem Modal ─────────────────────────────────────────────────────────
-function ProblemModal({
+// ─── Problem Panel ─────────────────────────────────────────────────────────
+function ProblemPanel({
   problem,
+  moveAttempted,
   onSolved,
   onFailed,
-  moveAttempted,
 }: {
   problem: Problem;
+  moveAttempted: string;
   onSolved: () => void;
   onFailed: () => void;
-  moveAttempted: string;
 }) {
-  const [code, setCode] = useState(problem.starter_code["javascript"] ?? "");
+  const [code, setCode] = useState(problem.starter_code["python"] ?? "");
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<{ passed: boolean; message: string } | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(intervalRef.current!); onFailed(); return 0; }
+        if (t <= 1) { clearInterval(timerRef.current!); onFailed(); return 0; }
         return t - 1;
       });
     }, 1000);
-    return () => clearInterval(intervalRef.current!);
+    return () => clearInterval(timerRef.current!);
   }, [onFailed]);
 
-  function formatTime(s: number) {
-    return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-  }
-
-  function handleRun() {
+  async function handleRun() {
     setRunning(true);
     setOutput(null);
-    setTimeout(() => {
-      const result = runJSTests(code, problem.test_cases as Array<{ input: Record<string, unknown>; expected: unknown }>);
-      if (result.passed) {
-        setOutput({ passed: true, message: "All test cases passed!" });
-        clearInterval(intervalRef.current!);
-        setTimeout(onSolved, 600);
-      } else if (result.failedCase) {
-        const { input, expected, got } = result.failedCase;
-        setOutput({
-          passed: false,
-          message: `Failed: input=${JSON.stringify(input)}, expected=${JSON.stringify(expected)}, got=${JSON.stringify(got)}`,
-        });
-      } else {
-        setOutput({ passed: false, message: "Error running code. Check your solution." });
-      }
-      setRunning(false);
-    }, 100);
+    const result = await runPyTests(code, problem.test_cases as Array<{ input: Record<string, unknown>; expected: unknown }>);
+    if (result.passed) {
+      setOutput({ passed: true, message: "All test cases passed!" });
+      clearInterval(timerRef.current!);
+      setTimeout(onSolved, 600);
+    } else if (result.failedCase) {
+      const { input, expected, got } = result.failedCase;
+      setOutput({ passed: false, message: `Input: ${JSON.stringify(input)} → got ${JSON.stringify(got)}, expected ${JSON.stringify(expected)}` });
+    } else {
+      setOutput({ passed: false, message: "Error in your code — check the console." });
+    }
+    setRunning(false);
   }
 
-  const timerColor = timeLeft < 30 ? T.red : timeLeft < 60 ? T.yellow : T.textSec;
+  const timerColor = timeLeft < 30 ? T.red : timeLeft < 60 ? T.yellow : T.textMut;
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16,
-    }}>
-      <div style={{
-        background: T.bg, border: `1px solid ${T.border}`, borderRadius: 16,
-        width: "100%", maxWidth: 900, maxHeight: "90vh",
-        display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>
-        {/* Header */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 24px", borderBottom: `1px solid ${T.border}`, flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: T.textPri, letterSpacing: "-0.01em" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+
+      <div style={{ padding: "20px 24px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <p style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase",
+              color: T.textMut, marginBottom: 6,
+            }}>
+              Solve to move {moveAttempted}
+            </p>
+            <h3 style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: T.text, marginBottom: 8 }}>
               {problem.title}
-            </span>
+            </h3>
             <span style={{
-              fontSize: 11, fontFamily: "var(--font-geist-mono), monospace",
-              letterSpacing: "0.06em", textTransform: "uppercase",
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase",
               padding: "3px 8px", borderRadius: 4,
-              background: `${DIFF_COLOR[problem.difficulty]}20`,
+              background: `${DIFF_COLOR[problem.difficulty]}15`,
               color: DIFF_COLOR[problem.difficulty],
             }}>
               {problem.difficulty}
             </span>
-            <span style={{ fontSize: 12, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace" }}>
-              Move: {moveAttempted}
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <p style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", marginBottom: 4 }}>
+              TIME
+            </p>
+            <span style={{
+              fontSize: 28, fontWeight: 800, letterSpacing: "-0.04em",
+              fontFamily: "var(--font-geist-mono), monospace", color: timerColor,
+            }}>
+              {fmt(timeLeft)}
             </span>
           </div>
-          <span style={{
-            fontSize: 20, fontWeight: 800, fontFamily: "var(--font-geist-mono), monospace",
-            color: timerColor, letterSpacing: "-0.02em",
-          }}>
-            {formatTime(timeLeft)}
-          </span>
         </div>
+      </div>
 
-        {/* Body */}
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          {/* Problem */}
-          <div style={{
-            width: "42%", borderRight: `1px solid ${T.border}`,
-            padding: "20px 24px", overflowY: "auto", flexShrink: 0,
-          }}>
-            <div style={{ fontSize: 13, color: T.textSec, lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
-              {problem.description}
-            </div>
-            {problem.examples.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: T.textPri, marginBottom: 12 }}>Examples</p>
-                {problem.examples.map((ex, i) => (
-                  <div key={i} style={{
-                    background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 8,
-                    padding: 12, marginBottom: 10, fontSize: 12, fontFamily: "var(--font-geist-mono), monospace",
-                  }}>
-                    <div style={{ color: T.textSec, marginBottom: 4 }}>Input: <span style={{ color: T.textPri }}>{ex.input}</span></div>
-                    <div style={{ color: T.textSec }}>Output: <span style={{ color: T.textPri }}>{ex.output}</span></div>
-                    {ex.explanation && <div style={{ color: T.textMut, marginTop: 4 }}>// {ex.explanation}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {problem.constraints && (
-              <div style={{ marginTop: 16 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: T.textPri, marginBottom: 8 }}>Constraints</p>
-                <pre style={{ fontSize: 11, color: T.textSec, fontFamily: "var(--font-geist-mono), monospace", lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>
-                  {problem.constraints}
-                </pre>
-              </div>
-            )}
-          </div>
-
-          {/* Editor */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{
-              padding: "8px 16px", borderBottom: `1px solid ${T.border}`,
-              display: "flex", alignItems: "center",
-            }}>
-              <span style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.06em" }}>
-                JAVASCRIPT
-              </span>
-            </div>
-            <textarea
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              spellCheck={false}
-              style={{
-                flex: 1, background: T.bgSec, color: T.textPri,
-                fontFamily: "var(--font-geist-mono), monospace", fontSize: 13,
-                lineHeight: 1.6, padding: 16, border: "none", outline: "none",
-                resize: "none", tabSize: 2,
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  const s = e.currentTarget.selectionStart;
-                  const end = e.currentTarget.selectionEnd;
-                  setCode(code.substring(0, s) + "  " + code.substring(end));
-                  setTimeout(() => { e.currentTarget.selectionStart = s + 2; e.currentTarget.selectionEnd = s + 2; });
-                }
-              }}
-            />
-            {output && (
-              <div style={{
-                padding: "12px 16px", borderTop: `1px solid ${T.border}`,
-                background: output.passed ? `${T.green}10` : `${T.red}10`, flexShrink: 0,
+      <div style={{ padding: "16px 24px", overflowY: "auto", maxHeight: 220, borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0 }}>
+          {problem.description}
+        </p>
+        {problem.examples.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            {problem.examples.slice(0, 2).map((ex, i) => (
+              <div key={i} style={{
+                background: T.bgAlt, borderRadius: 8, padding: "10px 12px",
+                marginBottom: 8, fontSize: 12, fontFamily: "var(--font-geist-mono), monospace",
               }}>
-                <p style={{ fontSize: 12, fontFamily: "var(--font-geist-mono), monospace", color: output.passed ? T.green : T.red, margin: 0, lineHeight: 1.5 }}>
-                  {output.passed ? "✓ " : "✗ "}{output.message}
-                </p>
+                <span style={{ color: T.textMut }}>In: </span>
+                <span style={{ color: T.text }}>{ex.input}</span>
+                <span style={{ color: T.textMut }}> → </span>
+                <span style={{ color: T.text }}>{ex.output}</span>
               </div>
-            )}
-            <div style={{
-              padding: "12px 16px", borderTop: `1px solid ${T.border}`,
-              display: "flex", gap: 8, flexShrink: 0,
-            }}>
-              <button
-                onClick={handleRun}
-                disabled={running}
-                style={{
-                  padding: "9px 20px", background: T.accent, color: "#fff",
-                  border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                  cursor: running ? "wait" : "pointer", opacity: running ? 0.7 : 1, fontFamily: "inherit",
-                }}
-              >
-                {running ? "Running…" : "Run & Submit"}
-              </button>
-              <button
-                onClick={onFailed}
-                style={{
-                  padding: "9px 16px", background: "transparent", color: T.textMut,
-                  border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13,
-                  cursor: "pointer", fontFamily: "inherit",
-                }}
-              >
-                Skip (lose turn)
-              </button>
-            </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: T.editorBg, overflow: "hidden", minHeight: 0 }}>
+        <CodeEditor value={code} onChange={setCode} />
+      </div>
+
+      <div style={{ flexShrink: 0, borderTop: `1px solid ${T.border}`, background: T.bg }}>
+        {output && (
+          <div style={{
+            padding: "10px 16px", borderBottom: `1px solid ${T.border}`,
+            background: output.passed ? `${T.green}08` : `${T.red}08`,
+          }}>
+            <p style={{
+              fontSize: 12, fontFamily: "var(--font-geist-mono), monospace",
+              color: output.passed ? T.green : T.red, margin: 0, lineHeight: 1.5,
+            }}>
+              {output.passed ? "✓ " : "✗ "}{output.message}
+            </p>
+          </div>
+        )}
+        <div style={{ padding: "14px 16px", display: "flex", gap: 8 }}>
+          <button
+            onClick={handleRun}
+            disabled={running}
+            style={{
+              flex: 1, padding: "10px 0", background: T.text, color: "#fff",
+              border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: running ? "wait" : "pointer", opacity: running ? 0.6 : 1,
+              fontFamily: "inherit", letterSpacing: "-0.01em",
+            }}
+          >
+            {running ? "Running…" : "Run & Submit"}
+          </button>
+          <button
+            onClick={onFailed}
+            style={{
+              padding: "10px 14px", background: "transparent", color: T.textMut,
+              border: `1px solid ${T.border}`, borderRadius: 8,
+              fontSize: 13, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+            }}
+          >
+            Skip turn
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Move History ──────────────────────────────────────────────────────────
+function MoveList({ moves }: { moves: { san: string; color: "w" | "b"; solved?: boolean }[] }) {
+  return (
+    <div style={{ padding: "24px" }}>
+      <p style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
+        Move History
+      </p>
+      {moves.length === 0 ? (
+        <p style={{ fontSize: 13, color: T.textMut }}>No moves yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => {
+            const w = moves[i * 2];
+            const b = moves[i * 2 + 1];
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", minWidth: 22 }}>
+                  {i + 1}.
+                </span>
+                {w && (
+                  <span style={{
+                    fontSize: 13, fontFamily: "var(--font-geist-mono), monospace",
+                    color: w.solved === false ? T.red : T.text,
+                    minWidth: 60,
+                  }}>
+                    {w.san}
+                    {w.solved === true && <span style={{ color: T.green, marginLeft: 4 }}>✓</span>}
+                    {w.solved === false && <span style={{ color: T.red, marginLeft: 4 }}>✗</span>}
+                  </span>
+                )}
+                {b && (
+                  <span style={{ fontSize: 13, fontFamily: "var(--font-geist-mono), monospace", color: T.textSec }}>
+                    {b.san}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── AI Game Room ──────────────────────────────────────────────────────────
-type Phase = "idle" | "player_turn" | "ai_thinking" | "game_over";
+type Phase = "player_turn" | "ai_thinking" | "game_over";
 
 export default function AIGameRoom() {
   const [chess] = useState(() => new Chess());
@@ -275,22 +269,18 @@ export default function AIGameRoom() {
   const [boardSize, setBoardSize] = useState(480);
   const [phase, setPhase] = useState<Phase>("player_turn");
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-  const [highlightSquares, setHighlightSquares] = useState<Record<string, React.CSSProperties>>({});
+  const [highlights, setHighlights] = useState<Record<string, React.CSSProperties>>({});
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string } | null>(null);
   const [activeProblem, setActiveProblem] = useState<Problem | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: "player" | "ai" | "draw"; reason: string } | null>(null);
   const [moveHistory, setMoveHistory] = useState<{ san: string; color: "w" | "b"; solved?: boolean }[]>([]);
-  const [aiStatus, setAiStatus] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Player is always white
-  const playerColor = "w";
+  const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function measure() {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setBoardSize(Math.max(Math.min(rect.width - 32, rect.height - 32, 520), 280));
+      if (boardRef.current) {
+        const rect = boardRef.current.getBoundingClientRect();
+        setBoardSize(Math.max(Math.min(rect.width - 48, rect.height - 100, 540), 260));
       }
     }
     measure();
@@ -298,115 +288,88 @@ export default function AIGameRoom() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  function getLegalSquares(square: string): string[] {
-    return chess.moves({ square: square as Square, verbose: true }).map((m) => m.to);
+  function getLegalSquares(sq: string): string[] {
+    return chess.moves({ square: sq as Square, verbose: true }).map((m) => m.to);
   }
+
+  function setSelection(sq: string) {
+    const legal = getLegalSquares(sq);
+    const h: Record<string, React.CSSProperties> = {};
+    h[sq] = { background: "rgba(15,15,13,0.12)", borderRadius: "50%" };
+    legal.forEach((s) => { h[s] = { background: "rgba(15,15,13,0.07)", borderRadius: "50%" }; });
+    setSelectedSquare(sq); setHighlights(h);
+  }
+
+  function clearSelection() { setSelectedSquare(null); setHighlights({}); }
 
   function handleSquareClick({ square }: { piece: { pieceType: string } | null; square: string }) {
     if (phase !== "player_turn" || activeProblem) return;
-
     const piece = chess.get(square as Square);
 
     if (selectedSquare) {
-      const legal = getLegalSquares(selectedSquare);
-      if (legal.includes(square)) {
-        // Pre-validate move
+      if (getLegalSquares(selectedSquare).includes(square)) {
         const testChess = new Chess(chess.fen());
         const result = testChess.move({ from: selectedSquare as Square, to: square as Square, promotion: "q" });
         if (!result) return;
-        setPendingMove({ from: selectedSquare, to: square, san: result.san });
-        setSelectedSquare(null);
-        setHighlightSquares({});
+        clearSelection();
         openProblem(selectedSquare, square, result.san);
         return;
       }
-      if (piece?.color === playerColor) {
-        setSelectedSquare(square);
-        const legalSqs = getLegalSquares(square);
-        const h: Record<string, React.CSSProperties> = {};
-        h[square] = { background: "rgba(79,142,247,0.4)", borderRadius: "50%" };
-        legalSqs.forEach((sq) => { h[sq] = { background: "rgba(79,142,247,0.25)", borderRadius: "50%" }; });
-        setHighlightSquares(h);
-        return;
-      }
-      setSelectedSquare(null);
-      setHighlightSquares({});
-      return;
+      if (piece?.color === "w") { setSelection(square); return; }
+      clearSelection(); return;
     }
-
-    if (piece?.color === playerColor) {
-      setSelectedSquare(square);
-      const legalSqs = getLegalSquares(square);
-      const h: Record<string, React.CSSProperties> = {};
-      h[square] = { background: "rgba(79,142,247,0.4)", borderRadius: "50%" };
-      legalSqs.forEach((sq) => { h[sq] = { background: "rgba(79,142,247,0.25)", borderRadius: "50%" }; });
-      setHighlightSquares(h);
-    }
+    if (piece?.color === "w") setSelection(square);
   }
 
   async function openProblem(from: string, to: string, san: string) {
-    const prob = await getRandomProblem();
     setPendingMove({ from, to, san });
+    const prob = await getRandomProblem();
     setActiveProblem(prob);
   }
 
-  const handleProblemSolved = useCallback(() => {
-    if (!pendingMove) return;
-    setActiveProblem(null);
-
-    chess.move({ from: pendingMove.from as Square, to: pendingMove.to as Square, promotion: "q" });
-    setFen(chess.fen());
-    setMoveHistory((h) => [...h, { san: pendingMove.san, color: "w", solved: true }]);
-    setPendingMove(null);
-
-    if (chess.isGameOver()) {
-      endGame();
-    } else {
-      setPhase("ai_thinking");
-      runAI();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMove]);
-
-  const handleProblemFailed = useCallback(() => {
-    if (!pendingMove) return;
-    setActiveProblem(null);
-    setMoveHistory((h) => [...h, { san: pendingMove.san + "?", color: "w", solved: false }]);
-    setPendingMove(null);
-    setPhase("ai_thinking");
-    runAI();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMove]);
-
   function endGame() {
     if (chess.isCheckmate()) {
-      const winner = chess.turn() === "w" ? "ai" : "player"; // loser's turn = checkmate
-      setGameOver({ winner, reason: "Checkmate" });
-    } else if (chess.isDraw()) {
-      setGameOver({ winner: "draw", reason: "Draw" });
+      setGameOver({ winner: chess.turn() === "w" ? "ai" : "player", reason: "Checkmate" });
     } else {
-      setGameOver({ winner: "draw", reason: "Game over" });
+      setGameOver({ winner: "draw", reason: "Draw" });
     }
     setPhase("game_over");
   }
 
   function runAI() {
-    setAiStatus("Thinking…");
-    // Slight delay for realism
     setTimeout(() => {
       const move = pickAIMove(chess);
       if (!move) { endGame(); return; }
       chess.move(move);
       setFen(chess.fen());
       setMoveHistory((h) => [...h, { san: move, color: "b" }]);
-      setAiStatus("");
-      if (chess.isGameOver()) {
-        endGame();
-      } else {
-        setPhase("player_turn");
-      }
-    }, 800 + Math.random() * 600);
+      if (chess.isGameOver()) endGame();
+      else setPhase("player_turn");
+    }, 700 + Math.random() * 500);
   }
+
+  const handleProblemSolved = useCallback(() => {
+    if (!pendingMove) return;
+    setActiveProblem(null);
+    chess.move({ from: pendingMove.from as Square, to: pendingMove.to as Square, promotion: "q" });
+    setFen(chess.fen());
+    setMoveHistory((h) => [...h, { san: pendingMove.san, color: "w", solved: true }]);
+    setPendingMove(null);
+    if (chess.isGameOver()) endGame();
+    else { setPhase("ai_thinking"); runAI(); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMove]);
+
+  const handleProblemFailed = useCallback(() => {
+    if (!pendingMove) return;
+    setActiveProblem(null);
+    setMoveHistory((h) => [...h, { san: pendingMove.san, color: "w", solved: false }]);
+    setPendingMove(null);
+    clearSelection();
+    setPhase("ai_thinking");
+    runAI();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMove]);
 
   function resetGame() {
     chess.reset();
@@ -414,221 +377,193 @@ export default function AIGameRoom() {
     setPhase("player_turn");
     setGameOver(null);
     setMoveHistory([]);
-    setSelectedSquare(null);
-    setHighlightSquares({});
+    clearSelection();
     setPendingMove(null);
     setActiveProblem(null);
-    setAiStatus("");
   }
 
   const isPlayerTurn = phase === "player_turn";
-
-  let statusMsg = "";
-  if (phase === "player_turn") statusMsg = "Your turn — pick a piece to move";
-  else if (phase === "ai_thinking") statusMsg = aiStatus || "AI is making a move…";
-  else if (phase === "game_over") statusMsg = "Game over";
+  const isAITurn = phase === "ai_thinking";
 
   return (
     <div style={{
       background: T.bg, minHeight: "100vh", display: "flex", flexDirection: "column",
-      fontFamily: "var(--font-geist), system-ui, sans-serif", color: T.textPri,
+      fontFamily: "var(--font-geist), system-ui, sans-serif", color: T.text,
     }}>
-      {/* Top bar */}
-      <div style={{
+
+      {/* Nav */}
+      <nav style={{
         height: 52, borderBottom: `1px solid ${T.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px", flexShrink: 0,
+        padding: "0 28px", flexShrink: 0,
       }}>
-        <a href="/" style={{ fontWeight: 800, fontSize: 14, letterSpacing: "-0.02em", color: T.textPri, textDecoration: "none" }}>
+        <a href="/" style={{ fontWeight: 800, fontSize: 14, letterSpacing: "-0.03em", color: T.text, textDecoration: "none" }}>
           KnightCode
         </a>
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{
-            fontSize: 11, padding: "3px 10px", borderRadius: 4,
-            background: "#22c55e20", color: T.green,
-            fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.06em",
+            fontSize: 10, padding: "3px 10px", borderRadius: 4,
+            background: `${T.green}12`, color: T.green,
+            fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em",
           }}>
             VS AI
           </span>
-          <a href="/" style={{ fontSize: 13, color: T.textMut, textDecoration: "none" }}>← Back</a>
+          <a href="/" style={{ fontSize: 13, color: T.textMut, textDecoration: "none" }}>← Leave</a>
         </div>
-      </div>
+      </nav>
 
-      {/* Main */}
+      {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Board */}
+
+        {/* Board area */}
         <div
-          ref={containerRef}
+          ref={boardRef}
           style={{
             flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", padding: 16, gap: 16,
+            alignItems: "center", justifyContent: "center",
+            padding: "32px 24px", gap: 0,
           }}
         >
-          {/* Status */}
+          {/* AI label */}
           <div style={{
-            padding: "8px 20px", background: T.bgCard, border: `1px solid ${T.border}`,
-            borderRadius: 8, fontSize: 13,
-            color: isPlayerTurn ? T.accent : phase === "ai_thinking" ? T.yellow : T.textSec,
-            fontWeight: isPlayerTurn ? 600 : 400,
+            width: boardSize, display: "flex", alignItems: "center",
+            justifyContent: "space-between", marginBottom: 12,
           }}>
-            {statusMsg}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.text }} />
+              <span style={{ fontSize: 13, color: T.textSec, fontWeight: 500 }}>AI</span>
+              <span style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.06em" }}>
+                black
+              </span>
+            </div>
+            {isAITurn && (
+              <span style={{ fontSize: 12, color: T.yellow }}>thinking…</span>
+            )}
           </div>
 
-          <Chessboard
-            options={{
-              position: fen,
-              boardOrientation: "white",
-              onSquareClick: handleSquareClick,
-              squareStyles: highlightSquares,
-              boardStyle: { width: boardSize, height: boardSize, borderRadius: 8 },
-              lightSquareStyle: { backgroundColor: "#e8e0d0" },
-              darkSquareStyle: { backgroundColor: "#8b7355" },
-              allowDragging: false,
-            }}
-          />
+          {/* Board */}
+          <div style={{ userSelect: "none", boxShadow: "0 1px 24px rgba(0,0,0,0.06)" }}>
+            <Chessboard
+              options={{
+                position: fen,
+                boardOrientation: "white",
+                onSquareClick: handleSquareClick,
+                squareStyles: highlights,
+                boardStyle: { width: boardSize, height: boardSize, borderRadius: 10 },
+                lightSquareStyle: { backgroundColor: "#ede0cc" },
+                darkSquareStyle: { backgroundColor: "#a07850" },
+                allowDragging: false,
+              }}
+            />
+          </div>
 
-          {selectedSquare && (
-            <div style={{ fontSize: 13, color: T.textMut }}>
-              Selected: <span style={{ color: T.textPri, fontFamily: "var(--font-geist-mono), monospace" }}>{selectedSquare}</span>
-              {" — click a highlighted square to attempt the move"}
+          {/* You label */}
+          <div style={{
+            width: boardSize, display: "flex", alignItems: "center",
+            justifyContent: "space-between", marginTop: 12,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", border: `1.5px solid ${T.border}` }} />
+              <span style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>You</span>
+              <span style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.06em" }}>
+                white
+              </span>
+            </div>
+            {isPlayerTurn && !activeProblem && (
+              <span style={{ fontSize: 12, color: T.green, fontWeight: 500 }}>your turn</span>
+            )}
+          </div>
+
+          {/* Status */}
+          {isAITurn && (
+            <div style={{
+              marginTop: 20, padding: "8px 16px",
+              background: T.bgAlt, border: `1px solid ${T.border}`,
+              borderRadius: 8, fontSize: 12, color: T.textSec,
+            }}>
+              AI is choosing a move…
             </div>
           )}
         </div>
 
         {/* Right panel */}
         <div style={{
-          width: 260, borderLeft: `1px solid ${T.border}`, background: T.bgSec,
-          display: "flex", flexDirection: "column", padding: 20, gap: 24,
-          flexShrink: 0, overflowY: "auto",
+          width: 420, borderLeft: `1px solid ${T.border}`,
+          display: "flex", flexDirection: "column",
+          background: T.bg, overflow: "hidden", flexShrink: 0,
         }}>
-          {/* Players */}
-          <div>
-            <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", marginBottom: 12 }}>
-              PLAYERS
-            </p>
-            {[
-              { label: "You", color: "white", active: isPlayerTurn },
-              { label: "AI", color: "black", active: phase === "ai_thinking" },
-            ].map((p) => (
-              <div key={p.label} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 12px", borderRadius: 8,
-                background: p.active ? `${T.accent}15` : "transparent",
-                border: `1px solid ${p.active ? T.accent : T.border}`,
-                marginBottom: 8,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: T.textPri, fontWeight: p.active ? 600 : 400 }}>{p.label}</span>
-                  <span style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace" }}>{p.color}</span>
-                </div>
-                {p.active && (
-                  <span style={{ fontSize: 11, color: T.accent }}>
-                    {p.label === "AI" ? "thinking…" : "your turn"}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Move history */}
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", marginBottom: 12 }}>
-              MOVES
-            </p>
-            {moveHistory.length === 0 ? (
-              <p style={{ fontSize: 12, color: T.textMut }}>No moves yet</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {Array.from({ length: Math.ceil(moveHistory.length / 2) }, (_, i) => {
-                  const w = moveHistory[i * 2];
-                  const b = moveHistory[i * 2 + 1];
-                  return (
-                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", minWidth: 20 }}>
-                        {i + 1}.
+          {activeProblem && pendingMove ? (
+            <ProblemPanel
+              problem={activeProblem}
+              moveAttempted={`${pendingMove.from} → ${pendingMove.to}`}
+              onSolved={handleProblemSolved}
+              onFailed={handleProblemFailed}
+            />
+          ) : (
+            <div style={{ overflowY: "auto" }}>
+              {/* How to play */}
+              <div style={{ padding: "24px", borderBottom: `1px solid ${T.border}` }}>
+                <p style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
+                  How to play
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    "Click a piece to select it",
+                    "Click a highlighted square to attempt the move",
+                    "Solve the coding problem within 3 minutes",
+                    "Solve → your move plays. Fail → turn skipped, AI moves.",
+                  ].map((s, i) => (
+                    <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <span style={{ fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: T.textMut, flexShrink: 0, marginTop: 2 }}>
+                        0{i + 1}
                       </span>
-                      {w && (
-                        <span style={{
-                          fontSize: 12, fontFamily: "var(--font-geist-mono), monospace",
-                          color: w.solved === false ? T.red : T.textPri,
-                        }}>
-                          {w.san} {w.solved === true ? "✓" : w.solved === false ? "✗" : ""}
-                        </span>
-                      )}
-                      {b && (
-                        <span style={{
-                          fontSize: 12, fontFamily: "var(--font-geist-mono), monospace",
-                          color: T.textSec,
-                        }}>
-                          {b.san}
-                        </span>
-                      )}
+                      <span style={{ fontSize: 13, color: T.textSec, lineHeight: 1.5 }}>{s}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
-
-          {/* Rules reminder */}
-          <div>
-            <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", marginBottom: 8 }}>
-              RULES
-            </p>
-            <div style={{ fontSize: 11, color: T.textMut, lineHeight: 1.65, display: "flex", flexDirection: "column", gap: 4 }}>
-              <p style={{ margin: 0 }}>You must solve a coding problem to make each move.</p>
-              <p style={{ margin: 0 }}>Fail in 3 min → turn skipped.</p>
-              <p style={{ margin: 0 }}>AI moves instantly.</p>
+              <MoveList moves={moveHistory} />
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Problem modal */}
-      {activeProblem && pendingMove && (
-        <ProblemModal
-          problem={activeProblem}
-          onSolved={handleProblemSolved}
-          onFailed={handleProblemFailed}
-          moveAttempted={`${pendingMove.from}→${pendingMove.to}`}
-        />
-      )}
-
-      {/* Game over overlay */}
+      {/* Game over */}
       {gameOver && (
         <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+          position: "fixed", inset: 0, background: "rgba(247,243,238,0.92)",
+          backdropFilter: "blur(4px)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 100,
         }}>
           <div style={{
-            background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 16,
-            padding: 48, textAlign: "center", maxWidth: 380,
+            background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 20, padding: "48px 52px",
+            textAlign: "center", maxWidth: 380,
+            boxShadow: "0 8px 48px rgba(0,0,0,0.08)",
           }}>
-            <p style={{ fontSize: 48, margin: "0 0 16px" }}>
-              {gameOver.winner === "player" ? "🏆" : gameOver.winner === "ai" ? "💀" : "🤝"}
+            <p style={{ fontSize: 52, margin: "0 0 20px" }}>
+              {gameOver.winner === "player" ? "♛" : gameOver.winner === "ai" ? "♟" : "="}
             </p>
-            <h2 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 8, color: T.textPri }}>
-              {gameOver.winner === "player" ? "You beat the AI!" : gameOver.winner === "ai" ? "AI wins." : "Draw!"}
+            <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 8, color: T.text }}>
+              {gameOver.winner === "player" ? "You won." : gameOver.winner === "ai" ? "AI wins." : "Draw."}
             </h2>
-            <p style={{ fontSize: 14, color: T.textSec, marginBottom: 32 }}>{gameOver.reason}</p>
+            <p style={{ fontSize: 14, color: T.textSec, marginBottom: 36 }}>{gameOver.reason}.</p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button
                 onClick={resetGame}
                 style={{
-                  padding: "12px 24px", background: T.accent, color: "#fff",
-                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                  padding: "12px 28px", background: T.text, color: "#f7f3ee",
+                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em",
                 }}
               >
-                Play again
+                Play again →
               </button>
-              <a
-                href="/"
-                style={{
-                  padding: "12px 24px", background: "transparent", color: T.textSec,
-                  border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14,
-                  textDecoration: "none", display: "inline-flex", alignItems: "center",
-                }}
-              >
+              <a href="/" style={{
+                padding: "12px 20px", background: "transparent", color: T.textSec,
+                border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14,
+                textDecoration: "none", display: "inline-flex", alignItems: "center",
+              }}>
                 Home
               </a>
             </div>
