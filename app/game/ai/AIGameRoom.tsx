@@ -361,11 +361,15 @@ export default function AIGameRoom() {
   }, [pendingMove]);
 
   const handleProblemFailed = useCallback(() => {
-    if (!pendingMove) return;
     setActiveProblem(null);
-    setMoveHistory((h) => [...h, { san: pendingMove.san, color: "w", solved: false }]);
-    setPendingMove(null);
+    if (pendingMove) {
+      setMoveHistory((h) => [...h, { san: pendingMove.san, color: "w", solved: false }]);
+      setPendingMove(null);
+    }
     clearSelection();
+    // Flip turn to black so AI can legally move (player skipped without moving)
+    chess.load(chess.fen().replace(/ w /, " b "));
+    setFen(chess.fen());
     setPhase("ai_thinking");
     runAI();
   // eslint-disable-next-line react-hooks/exhaustive-deps
