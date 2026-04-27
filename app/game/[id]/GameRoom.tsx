@@ -517,8 +517,8 @@ export default function GameRoom({ gameId }: { gameId: string }) {
                 onSquareClick: handleSquareClick,
                 squareStyles: highlights,
                 boardStyle: { width: boardSize, height: boardSize, borderRadius: 10 },
-                lightSquareStyle: { backgroundColor: "#ede0cc" },
-                darkSquareStyle: { backgroundColor: "#a07850" },
+                lightSquareStyle: { backgroundColor: "#f0d9b5" },
+                darkSquareStyle: { backgroundColor: "#b58863" },
                 allowDragging: false,
               }}
             />

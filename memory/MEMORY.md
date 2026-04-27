@@ -7,14 +7,16 @@ Faster solver earns the move. Fail in 3 min → turn skipped. Checkmate wins.
 
 ## Tech Stack
 - Next.js 16 (App Router), TypeScript, React 19
-- Supabase project: `fkideaqnvysrwginfxnr` (fkideaqnvysrwginfxnr.supabase.co)
+- Supabase project: `qleygmfxudilbmcujmov` (qleygmfxudilbmcujmov.supabase.co) — "knightcode"
 - chess.js v1.4, react-chessboard v5.10
 - Tailwind CSS v4
 
 ## Key Files
 - `app/page.tsx` — Landing page (light theme, create/join game)
 - `app/game/[id]/page.tsx` + `GameRoom.tsx` — Main game room
-- `lib/supabase.ts` — Supabase client + `getPlayerId()` (localStorage UUID, no auth)
+- `lib/supabase.ts` — Supabase client + `getPlayerId()` (async, uses auth user ID) + `signOut()`
+- `app/auth/page.tsx` — Sign in / sign up page (tab toggle, email+password)
+- `proxy.ts` — Next.js 16 Proxy (middleware) protecting `/game/[id]` routes
 - `lib/game.ts` — Game logic (createGame, joinGame, submitMove, skipTurn, runJSTests)
 - `types/index.ts` — Game, Problem, Turn types
 - `types/supabase.ts` — Generated Supabase types
@@ -44,7 +46,9 @@ Faster solver earns the move. Fail in 3 min → turn skipped. Checkmate wins.
 - Realtime enabled on `games` and `turns` tables
 
 ## Auth Approach
-No Supabase Auth — using localStorage UUID via `getPlayerId()`. No FK constraints on player columns.
+Supabase email/password auth. `getPlayerId()` is async — returns auth user ID or random UUID fallback.
+`proxy.ts` protects `/game/[id]` (redirects to `/auth` if unauthenticated). `/game/ai` is open.
+In Next.js 16, middleware = `proxy.ts` exporting `proxy` function (not `middleware`).
 
 ## Code Execution
 In-browser JS execution via `new Function()` in `runJSTests()`. No Judge0 needed.

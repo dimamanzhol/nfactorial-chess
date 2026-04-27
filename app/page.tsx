@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getPlayerId } from "@/lib/supabase";
+import { getPlayerId, signOut, supabase } from "@/lib/supabase";
 import { createGame, joinGame } from "@/lib/game";
+import type { User } from "@supabase/supabase-js";
 
 const T = {
   bg: "#f7f3ee",
@@ -21,12 +22,21 @@ export default function HomePage() {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function handleCreate() {
     setCreating(true);
     setError("");
     try {
-      const game = await createGame(getPlayerId());
+      const game = await createGame(await getPlayerId());
       router.push(`/game/${game.id}?color=white`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create game");
@@ -39,12 +49,17 @@ export default function HomePage() {
     setJoining(true);
     setError("");
     try {
-      const game = await joinGame(roomCode, getPlayerId());
+      const game = await joinGame(roomCode, await getPlayerId());
       router.push(`/game/${game.id}?color=black`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Game not found");
       setJoining(false);
     }
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    router.refresh();
   }
 
   return (
@@ -65,6 +80,33 @@ export default function HomePage() {
         <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em", color: T.text }}>
           KnightCode
         </span>
+        {user ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: 13, color: T.textSec }}>{user.email}</span>
+            <button
+              onClick={handleSignOut}
+              style={{
+                fontSize: 13,
+                color: T.textSec,
+                background: "none",
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                padding: "5px 12px",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <a
+            href="/auth"
+            style={{ fontSize: 13, color: T.textSec, textDecoration: "none" }}
+          >
+            Sign in →
+          </a>
+        )}
       </nav>
 
       {/* Hero */}
@@ -240,7 +282,7 @@ export default function HomePage() {
             { label: "Real chess rules", desc: "Full FIDE-compliant moves — castling, en passant, promotion." },
             { label: "Coding problems", desc: "Easy to hard LeetCode-style problems. Currently supports JavaScript." },
             { label: "3-minute timer", desc: "Fail to solve in time and your turn is automatically skipped." },
-            { label: "No account needed", desc: "Share a 6-char code and start playing instantly. Anonymous auth." },
+            { label: "Persistent accounts", desc: "Sign up to track games and play with friends reliably." },
           ].map((f) => (
             <div key={f.label} style={{
               padding: "20px",
