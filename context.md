@@ -1,285 +1,104 @@
 # ♟️ KnightCode — CONTEXT.md
 
-> _"The best engineers think like chess players. Now you can train like one."_
+> _"Chess meets LeetCode. Beat your friend on the board AND in code."_
 
 ---
 
 ## 1. What is KnightCode?
 
-KnightCode is a **BigTech interview simulator** disguised as a chess platform.
+KnightCode is a **competitive multiplayer chess game where you can only make a move after solving a coding problem.**
 
-It combines chess puzzles with a live AI interviewer that talks to you while you solve problems — exactly like a real technical interview at Google, Meta, Amazon, or Apple.
+Two players compete against each other. When it's your turn, you select your chess move — but it won't execute until you solve a LeetCode-style Easy problem in the built-in code editor. Solve it → move happens. Fail (time runs out) → you skip your turn.
 
-You don't just solve a puzzle. You explain your thinking, respond to follow-up questions, handle pressure, and get evaluated on your logic AND your communication — just like a real interview.
-
-**This is not a chess site. This is a career tool.**
+This is not a chess site. This is not a LeetCode clone. It's a completely new category: **competitive coding disguised as a chess game.**
 
 ---
 
 ## 2. The Core Problem
 
-Coding interview prep is broken:
+Interview prep is boring and lonely:
 
-- LeetCode gives you problems but no human feedback
-- Mock interviews are expensive ($100-300/session)
-- Nobody trains the "explain your thinking" muscle — the hardest part of real interviews
+- LeetCode is a grind with no stakes and no opponent
+- There's no fun, competitive way to practice coding problems with friends
+- Nobody trains "solving under pressure" — the hardest part of real interviews
 
-Chess is the perfect proxy for algorithmic thinking:
-
-- Pattern recognition
-- Multiple steps ahead thinking
-- Decision making under pressure
-- Explaining your reasoning out loud
-
-**KnightCode merges both worlds.**
+KnightCode fixes all three. You're solving real coding problems, under a real timer, with a real opponent watching. That's pressure. That's practice.
 
 ---
 
-## 3. The Core Experience
-
-### What happens in a session:
+## 3. Core Game Loop
 
 ```
-1. User picks a company (Google / Meta / Amazon / Apple)
-2. UI transforms into a mock interview room — clean, professional, slightly tense
-3. AI Interviewer appears (avatar + name: "Alex from Google")
-4. Chess puzzle loads on screen + timer starts (15-20 min)
-5. AI speaks first: "Hi! Let's get started. Take a look at the board.
-   What's your initial assessment?"
-6. User types their thinking + makes moves on the board
-7. AI reacts in real-time:
-   - "Interesting. Why did you prioritize that piece?"
-   - "What alternatives did you consider?"
-   - "You have 5 minutes left — how are you feeling about your approach?"
-   - "That was a mistake — can you recover? Walk me through your thinking."
-8. Game ends → AI gives full structured debrief:
-   - Logic & problem solving score
-   - Communication score
-   - Speed & pressure handling
-   - What Google/Meta would think of this performance
-   - Specific tips to improve
+1. Player creates a game → gets a 6-character room code (e.g. "XK92PL")
+2. Shares the link with a friend → friend joins
+3. Game starts — standard chess board, White moves first
+4. White selects a piece and a target square
+5. A coding problem appears for both players to see
+6. White has 3 minutes to solve it in the built-in code editor
+7. Code is executed against hidden test cases via Judge0 API
+8. All test cases pass → move executes on the board ✅
+9. Time runs out or wrong answer → turn is skipped ❌
+10. Black's turn — same flow
+11. Repeat until checkmate, stalemate, or draw
 ```
 
 ---
 
-## 4. Target Audience
+## 4. Detailed Rules
 
-| Segment                               | Why they care                                             |
-| ------------------------------------- | --------------------------------------------------------- |
-| CS students preparing for internships | Need mock interview practice, can't afford coaches        |
-| Junior devs applying to BigTech       | Want to feel what a real interview is like                |
-| Self-taught developers                | No university career center to help them prep             |
-| International students                | Practice English + technical communication simultaneously |
-
-**Primary persona:** 20-26 year old CS student or junior dev who has LeetCode but has never done a real mock interview and is terrified of the communication part.
-
----
-
-## 5. Why Chess Specifically?
-
-Chess puzzles are perfect interview proxies because:
-
-- ✅ They have a **clear optimal solution** (like algorithms)
-- ✅ They require **multi-step thinking** (like system design)
-- ✅ They create **time pressure** (like real interviews)
-- ✅ They are **language-agnostic** (no coding syntax barrier)
-- ✅ They are **visually engaging** (unlike staring at code)
-- ✅ The interviewer can ask "why this move?" just like "why this approach?"
-
-Chess puzzles map directly to interview skills:
-
-| Chess                  | Interview                     |
-| ---------------------- | ----------------------------- |
-| Find the winning move  | Find the optimal solution     |
-| Explain why Nf3        | Explain your algorithm choice |
-| Recover from a blunder | Debug under pressure          |
-| Think 5 moves ahead    | Plan system architecture      |
+- Both players always see the **same problem** each turn
+- Only the **active player** needs to solve it to make their move
+- The opponent watches and waits (they can read the problem too)
+- Time limit: **3 minutes per problem**
+- Fail to solve → **turn is skipped**, opponent moves next
+- Problems are always **Easy difficulty** to keep games fast and fun
+- **Any programming language** accepted (Python, JS, Java, C++, Go, etc.)
+- Code is actually **executed and tested** — not just syntax checked
 
 ---
 
-## 6. Company Modes
+## 5. Target Audience
 
-Each company has a different interviewer personality and focus:
+| Segment           | Why they care                                           |
+| ----------------- | ------------------------------------------------------- |
+| CS students       | Fun way to practice interview problems with friends     |
+| Junior devs       | Competitive coding with real stakes                     |
+| Bootcamp students | Makes grinding LeetCode actually enjoyable              |
+| Friends who code  | Something new to play together instead of regular chess |
 
-### 🔵 Google
-
-- Interviewer: **Alex** — friendly but precise
-- Focus: Optimal solution, time complexity thinking
-- Style: "That works, but is there a more elegant approach?"
-- Puzzle type: Complex tactical puzzles requiring deep calculation
-
-### 🟣 Meta
-
-- Interviewer: **Jordan** — fast-paced, product-minded
-- Focus: Speed + impact, "does it ship?"
-- Style: "Good. Now do it faster. What's the bottleneck?"
-- Puzzle type: Mid-complexity puzzles under tight time pressure
-
-### 🟠 Amazon
-
-- Interviewer: **Sam** — leadership principles focused
-- Focus: Decision making + communication
-- Style: "Walk me through your reasoning. What would you do differently?"
-- Puzzle type: Endgame scenarios requiring clear strategic thinking
-
-### 🍎 Apple
-
-- Interviewer: **Riley** — design-minded, detail obsessed
-- Focus: Clarity of thought, elegance of solution
-- Style: "Why this and not that? Convince me."
-- Puzzle type: Opening puzzles about fundamentals done perfectly
+**Primary persona:** 20-26 year old CS student who already does LeetCode but wants something more engaging and competitive.
 
 ---
 
-## 7. AI Interviewer — How It Works
+## 6. Why This Works as a Product
 
-The AI interviewer is powered by **Claude API** with a carefully crafted system prompt.
-
-### System Prompt:
-
-```
-You are {name}, a senior engineer at {company} conducting a technical interview.
-
-Your personality: {company_personality}
-
-You are interviewing a candidate solving a chess puzzle as a proxy for
-algorithmic thinking.
-
-Current board state (FEN): {fen}
-Optimal solution: {solution_moves}
-Candidate's last move: {last_move}
-Time remaining: {time_left}
-
-Your job:
-- Ask questions about their thinking process
-- React to their moves (praise good ones, probe bad ones)
-- Create realistic interview pressure without being cruel
-- Never give away the answer directly
-- Ask follow-up questions like a real interviewer would
-- If they make a mistake, ask them to explain their reasoning first
-
-Keep responses SHORT (2-3 sentences max). This is a conversation, not a lecture.
-Stay in character as {name} from {company} at all times.
-```
-
-### Real-time interaction triggers:
-
-- After every move → Claude evaluates and responds
-- Every 5 minutes → time pressure check-in
-- On wrong moves → probing questions
-- On good moves → brief praise + harder follow-up
-- Final 2 minutes → "you're running out of time" pressure
+- **Retention:** You come back to play your friend again. And again.
+- **Virality:** "Bro play this with me" is the entire marketing strategy
+- **Real skill building:** You're actually solving coding problems under pressure
+- **Novel:** Nobody has built this. It's a genuinely new idea.
+- **Simple to explain:** One sentence — "Chess but you solve LeetCode to move"
 
 ---
 
-## 8. Post-Interview Debrief
+## 7. Tech Stack
 
-After the session, Claude generates a **structured performance report**:
-
-```
-Interview Debrief — Google Mock Interview
-Overall Score: 73/100 — "Strong Hire with coaching"
-
-Problem Solving: 8/10
-You found the key tactical motif quickly. Your calculation was accurate
-up to move 4, where you missed the defensive resource.
-
-Communication: 6/10
-You explained your first three moves clearly but went silent under
-pressure. Real interviewers notice when candidates stop talking.
-
-Pressure Handling: 7/10
-You recovered well from the blunder on move 6. Good sign.
-
-What Google would think:
-"Promising candidate. Shows strong pattern recognition but needs to work
-on communicating uncertainty. Would recommend another round."
-
-Top 3 things to improve:
-1. Keep talking even when you don't know the answer
-2. Always state time complexity of your approach
-3. Ask clarifying questions before diving in
-```
-
-This debrief is **shareable** — users post it on LinkedIn:
-
-> "Just completed a Google mock interview on KnightCode. Score: 73/100. Working on it 💪"
+| Layer          | Technology              | Why                                           |
+| -------------- | ----------------------- | --------------------------------------------- |
+| Framework      | Next.js 14 (App Router) | SSR, API routes, routing all in one           |
+| Styling        | Tailwind CSS            | Fast, consistent, dark theme                  |
+| Chess Logic    | `chess.js`              | Handles all rules, move validation, checkmate |
+| Chess UI       | `react-chessboard`      | Customizable board component                  |
+| Code Editor    | Monaco Editor           | VS Code in the browser                        |
+| Code Execution | Judge0 API (free tier)  | Runs code, checks test cases                  |
+| Multiplayer    | Supabase Realtime       | WebSocket channels, no extra server           |
+| Auth           | Supabase Auth           | Google OAuth + email                          |
+| Database       | Supabase PostgreSQL     | Games, users, problems, turns                 |
+| Deployment     | Vercel                  | Instant deploy, Next.js native                |
+| Payments       | Polar.sh                | No Stripe needed                              |
 
 ---
 
-## 9. Progression System
-
-Users level up through interview rounds:
-
-| Level | Title            | Unlocks                         |
-| ----- | ---------------- | ------------------------------- |
-| 1     | Intern Candidate | Basic puzzles, one company      |
-| 2     | New Grad         | All 4 companies, medium puzzles |
-| 3     | L3 Engineer      | Hard puzzles, timed sprints     |
-| 4     | Senior Engineer  | System design chess scenarios   |
-| 5     | Staff Engineer   | Custom interview scenarios      |
-
----
-
-## 10. Viral / Social Layer
-
-### LinkedIn Share Card
-
-After each session a beautiful card generates:
-
-```
-🎯 Mock Interview Complete
-Company: Google
-Score: 73/100
-Level: L3 Engineer
-"Strong Hire with coaching"
-
-Practiced on KnightCode.com
-```
-
-### Leaderboard
-
-- Global leaderboard by score
-- Filter by company (Who's the best Google candidate?)
-- Filter by city (Top candidates in Almaty 🇰🇿)
-- Weekly tournaments during hiring season
-
----
-
-## 11. Monetization
-
-Using **Polar.sh** (no Stripe needed).
-
-| Plan  | Price  | What you get                                                                              |
-| ----- | ------ | ----------------------------------------------------------------------------------------- |
-| Free  | $0     | 3 mock interviews/day, 2 companies, basic debrief                                         |
-| Pro   | $9/mo  | Unlimited interviews, all 4 companies, full AI debrief, LinkedIn cards, progress tracking |
-| Teams | $29/mo | For bootcamps / universities — track student progress, custom puzzles                     |
-
-**"Upgrade to Pro"** button visible from day one.
-
-The Teams plan is the real money — bootcamps and CS departments will pay for this.
-
----
-
-## 12. Tech Stack
-
-| Layer           | Technology              | Why                                        |
-| --------------- | ----------------------- | ------------------------------------------ |
-| Framework       | Next.js 14 (App Router) | SSR, API routes, routing all in one        |
-| Styling         | Tailwind CSS            | Fast, consistent                           |
-| Chess Logic     | `chess.js`              | Handles all rules, puzzle validation       |
-| Chess UI        | `react-chessboard`      | Customizable board component               |
-| AI Interviewer  | Anthropic Claude API    | Best conversational AI, stays in character |
-| Puzzle Database | Supabase PostgreSQL     | Categorized by difficulty + company        |
-| Auth            | Supabase Auth           | Email + Google OAuth                       |
-| Database        | Supabase PostgreSQL     | Users, sessions, scores, progress          |
-| Deployment      | Vercel                  | Instant deploy, Next.js native             |
-| Payments        | Polar.sh                | Works without Stripe                       |
-
----
-
-## 13. Database Schema
+## 8. Database Schema
 
 ### `users`
 
@@ -288,142 +107,282 @@ id uuid primary key
 email text
 username text
 avatar_url text
-level int default 1
-total_sessions int default 0
-avg_score float default 0
+games_played int default 0
+games_won int default 0
+problems_solved int default 0
+avg_solve_time float default 0
 created_at timestamp
 ```
 
-### `puzzles`
+### `games`
 
 ```sql
 id uuid primary key
-fen text                    -- board position
-solution_moves text[]       -- correct moves in UCI format
-difficulty text             -- 'easy' | 'medium' | 'hard'
-company text                -- 'google' | 'meta' | 'amazon' | 'apple' | 'any'
-theme text                  -- 'tactics' | 'endgame' | 'opening'
-rating int
+room_code text unique          -- 6 char code e.g. "XK92PL"
+player_white uuid references users(id)
+player_black uuid references users(id)
+status text                    -- 'waiting' | 'active' | 'finished'
+current_fen text               -- current board state
+current_turn text              -- 'white' | 'black'
+current_problem_id uuid        -- active problem for this turn
+winner uuid references users(id)
+pgn text                       -- full game notation
+created_at timestamp
 ```
 
-### `sessions`
+### `problems`
 
 ```sql
 id uuid primary key
-user_id uuid references users(id)
-puzzle_id uuid references puzzles(id)
-company text
-interviewer_name text
-moves_played text[]
-conversation jsonb           -- full AI conversation history
-score_problem_solving int
-score_communication int
-score_pressure int
-score_total int
-debrief text
-completed_at timestamp
+title text
+description text
+examples jsonb                 -- [{input, output, explanation}]
+constraints text
+test_cases jsonb               -- [{input, expected_output}] hidden from user
+difficulty text default 'easy'
+tags text[]                    -- ['array', 'hashmap', 'string', etc.]
+```
+
+### `turns`
+
+```sql
+id uuid primary key
+game_id uuid references games(id)
+player_id uuid references users(id)
+problem_id uuid references problems(id)
+move_from text                 -- e.g. 'e2'
+move_to text                   -- e.g. 'e4'
+code_submitted text
+language text
+solved boolean
+solve_time_seconds int
+created_at timestamp
 ```
 
 ---
 
-## 14. Key Pages & Routes
+## 9. Multiplayer Architecture
 
-| Route                  | Description                                                   |
-| ---------------------- | ------------------------------------------------------------- |
-| `/`                    | Landing page — professional, career-focused, slightly intense |
-| `/companies`           | Pick your company to interview with                           |
-| `/interview/[company]` | Live mock interview session                                   |
-| `/debrief/[sessionId]` | Post-interview performance report                             |
-| `/profile`             | User profile, history, scores, level                          |
-| `/leaderboard`         | Global + company + city rankings                              |
+Using **Supabase Realtime** channels. Channel: `game:{room_code}`
+
+### Events:
+
+```javascript
+// Player joined the room
+{ type: 'player_joined', player: { id, username, color } }
+
+// Active player selected a move, problem appears for both
+{ type: 'move_attempted', from: 'e2', to: 'e4', problem_id: '...' }
+
+// Active player solved the problem — move executes
+{ type: 'move_confirmed', from: 'e2', to: 'e4', fen: '...', pgn: '...' }
+
+// Active player failed — turn skipped
+{ type: 'move_failed', next_turn: 'black' }
+
+// Game over
+{ type: 'game_over', result: 'checkmate', winner: 'white' }
+```
+
+All game state also persisted to Supabase DB — handles reconnections gracefully.
 
 ---
 
-## 15. Design System
+## 10. Code Execution via Judge0
+
+API: `https://judge0-ce.p.rapidapi.com`
+
+```javascript
+// Submit code
+POST /submissions
+{
+  source_code: base64(userCode),
+  language_id: 71,   // Python=71, JS=63, Java=62, C++=54
+  stdin: base64(testInput)
+}
+
+// Poll result
+GET /submissions/{token}
+// status_id: 3=Accepted, 4=Wrong Answer, 5=Time Limit, 6=Compile Error
+
+// Run against ALL test cases
+// All pass → move confirmed
+// Any fail → show which test failed, player can retry until timer runs out
+```
+
+---
+
+## 11. Key Pages & Routes
+
+| Route              | Description                                   |
+| ------------------ | --------------------------------------------- |
+| `/`                | Landing page — hero, how it works, CTA        |
+| `/lobby`           | Create game or join with room code            |
+| `/game/[roomCode]` | The actual game — chess board + problem modal |
+| `/profile`         | Stats, game history, win rate                 |
+| `/leaderboard`     | Global rankings + filter by city              |
+
+---
+
+## 12. Game Page Layout
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  KnightCode ♟          Room: XK92PL          ⏱ 02:34   │
+├─────────────────────────┬────────────────────────────────┤
+│                         │  👤 You (White)                │
+│    [CHESS BOARD]        │  vs                            │
+│                         │  👤 Alex (Black)               │
+│                         │  ──────────────────────────    │
+│                         │  Alex is solving...            │
+│  ♟♟♙ captured           │  ──────────────────────────    │
+│                         │  Move history:                 │
+│                         │  1. e4 ✅   e5 ✅              │
+│                         │  2. Nf3 ❌  d6 ✅              │
+└─────────────────────────┴────────────────────────────────┘
+```
+
+### Problem Modal (when player selects a move):
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  ⚡ Solve to make your move              ⏱ 02:59        │
+│  ────────────────────────────────────────────────────    │
+│  Two Sum                                      Easy 🟢    │
+│                                                          │
+│  Given an array nums and target, return indices          │
+│  of two numbers that add up to target.                   │
+│                                                          │
+│  Example: nums=[2,7,11,15], target=9 → [0,1]            │
+│  ────────────────────────────────────────────────────    │
+│  Language: [Python ▾]                                    │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ def twoSum(nums, target):                       │     │
+│  │     # your solution here                        │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                          │
+│  [Run Tests]                   [Submit & Make Move]      │
+│                                                          │
+│  ✅ Test 1 passed    ❌ Test 2 failed                    │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 13. Design System
 
 ### Aesthetic Direction
 
-**Professional dark mode** — think Linear meets LeetCode meets a high-stakes interview room.
-
-Clean, minimal, slightly tense. Every design decision should make the user feel like they're in a real interview. This is not a game UI — it's a professional tool.
+Dark, clean, competitive. Think LeetCode meets Chess.com. Professional but with energy. Every pixel should say "this is serious, you are being tested."
 
 ### Color Palette
 
 ```css
---bg-primary: #0a0a0f /* Near-black, slightly cool */ --bg-secondary: #111118
-  /* Card backgrounds */ --bg-card: #16161f /* Elevated surfaces */
-  --border: #2a2a3a /* Subtle borders */ --accent-blue: #4f8ef7
-  /* Primary CTA */ --accent-green: #22c55e /* Success / correct move */
-  --accent-red: #ef4444 /* Error / wrong move */ --accent-yellow: #f59e0b
-  /* Warning / time running out */ --text-primary: #f0f0f8 /* Near white */
-  --text-secondary: #9090a8 /* Muted */ --text-muted: #55556a /* Very subtle */
-  /* Company colors */ --google: #4f8ef7 --meta: #7c4dff --amazon: #ff9900
-  --apple: #a8a8b3;
+--bg-primary: #0a0a0f --bg-secondary: #111118 --bg-card: #16161f
+  --border: #2a2a3a --accent: #4f8ef7 /* primary blue — CTA, highlights */
+  --accent-green: #22c55e /* solved / success / ✅ */ --accent-red: #ef4444
+  /* failed / skipped / ❌ */ --accent-yellow: #f59e0b /* timer warning */
+  --text-primary: #f0f0f8 --text-secondary: #9090a8 --text-muted: #55556a;
 ```
 
 ### Typography
 
 ```css
 --font-display:
-  "DM Sans", sans-serif /* Headings — modern, clean */ --font-body: "Inter",
-  sans-serif /* Body — readable, professional */ --font-mono: "JetBrains Mono",
-  monospace /* Move notation */;
+  "DM Sans", sans-serif --font-body: "Inter",
+  sans-serif --font-mono: "JetBrains Mono",
+  monospace /* code editor, move notation */;
 ```
 
-### Interview Room Layout
+### UI Details
 
-```
-┌─────────────────────────────────────────────────────┐
-│  🔵 Google Interview — Alex              ⏱ 12:34   │
-├──────────────────────┬──────────────────────────────┤
-│                      │  Alex from Google             │
-│   [CHESS BOARD]      │  ─────────────────────────   │
-│                      │  "Interesting choice. Why     │
-│                      │   did you move the knight     │
-│                      │   there instead of pushing    │
-│                      │   the pawn?"                  │
-│                      │                               │
-│                      │  ─────────────────────────   │
-│  Captured pieces     │  Your response:               │
-│  ♟♟♙                │  [___________________________]│
-│                      │              [Send]           │
-└──────────────────────┴──────────────────────────────┘
-```
-
-### UI Principles
-
-- **Professional tension** — UI should feel like you're being evaluated
-- **Minimal distractions** — during interview, only board + chat visible
-- **Clear feedback** — green/red immediately on moves
-- **Timer always visible** — creates real pressure
-- **Interviewer feels human** — avatar, name, company logo, typing indicator
+- Timer turns yellow under 60s, red under 30s
+- Move history shows ✅ (solved) or ❌ (skipped) per move
+- Opponent status always visible: "Solving...", "Waiting for you", "Thinking..."
+- Chess board: warm wood tones (not default blue/gray)
+- Problem modal: slide up from bottom on mobile, side panel on desktop
+- Typing indicator when opponent is coding
 
 ---
 
-## 16. What Makes This "Великий" Level
+## 14. Monetization
 
-1. **Genuinely unique concept** — nobody else is doing this. Not Chess.com, not LeetCode, not any interview prep platform
-2. **Real pain point** — mock interviews cost $100-300/session. This makes it accessible to everyone
-3. **Not just chess** — it's a career tool. TAM is every CS student on earth
-4. **AI used meaningfully** — Claude doesn't just generate text, it conducts a live interview
-5. **Retention built-in** — users come back to level up and prep for real interviews
-6. **Viral mechanic** — LinkedIn debrief cards get shared organically
-7. **Clear monetization** — Free → Pro → Teams funnel with real B2B potential
-8. **Judges will remember it** — out of 100 submissions, this is the only one that is a career tool
+**Polar.sh** for payments (no Stripe needed).
+
+| Plan | Price | What you get                                                              |
+| ---- | ----- | ------------------------------------------------------------------------- |
+| Free | $0    | 5 games/day, Easy problems, basic stats                                   |
+| Pro  | $7/mo | Unlimited games, Medium + Hard modes, full analytics, custom board themes |
+
+"Upgrade to Pro" button visible in nav from day one.
 
 ---
 
-## 17. README Summary (for submission)
+## 15. Seed Problems (minimum 20)
 
-**KnightCode** — _Train for BigTech interviews. One chess puzzle at a time._
+Start with these classics, all Easy:
 
-A mock interview simulator that uses chess puzzles as a proxy for algorithmic thinking. Pick a company (Google, Meta, Amazon, Apple), get matched with an AI interviewer, solve a puzzle under time pressure while explaining your thinking — then receive a structured performance debrief.
+- Two Sum
+- Valid Palindrome
+- Reverse String
+- FizzBuzz
+- Contains Duplicate
+- Maximum Subarray (Kadane's)
+- Merge Two Sorted Lists
+- Valid Parentheses
+- Best Time to Buy and Sell Stock
+- Climbing Stairs
+- Binary Search
+- First Bad Version
+- Majority Element
+- Move Zeroes
+- Reverse Linked List
+- Missing Number
+- Single Number
+- Intersection of Two Arrays
+- Squares of Sorted Array
+- Running Sum of 1D Array
 
-**Built with:** Next.js 14, Supabase, Anthropic Claude API, chess.js, Polar.sh, Vercel
+---
 
-**For:** CS students and junior developers preparing for BigTech interviews who need affordable mock interview practice with real feedback — not just on their solutions, but on how they communicate under pressure.
+## 16. Build Priority Order
 
-**Why it's valuable:** LeetCode trains your coding. KnightCode trains your thinking and communication under pressure — the part that actually gets you the offer.
+1. Supabase setup — tables + realtime config
+2. Chess board with move selection (chess.js + react-chessboard)
+3. Problem modal with Monaco editor
+4. Judge0 code execution + test case validation
+5. Multiplayer sync via Supabase Realtime
+6. Full game flow: move attempt → problem → solve/fail → next turn
+7. Landing page + lobby (create/join room)
+8. Profile page + leaderboard
+9. Auth (Supabase Google OAuth)
+10. Pro upgrade button (Polar.sh)
+
+---
+
+## 17. What Makes This "Великий" Level
+
+1. **Completely unique** — nobody has built this combination before
+2. **One sentence pitch** — "Chess but you solve LeetCode to move" — instantly understood
+3. **Real skill building** — actually improves coding under pressure
+4. **Viral by design** — "play me on KnightCode" is the whole growth loop
+5. **Genuine fun** — not just educational, actually enjoyable to play
+6. **Clear monetization** — Free → Pro with real upsell reason
+7. **Memorable** — out of 100 submissions, judges will remember this one
+
+---
+
+## 18. README Summary (for submission)
+
+**KnightCode** — _Chess meets LeetCode. Beat your friend on the board AND in code._
+
+A multiplayer chess game where you can only make a move after solving a coding problem. Challenge a friend via shared link, solve LeetCode-style problems under time pressure to make your chess moves, and win both the game and the coding battle.
+
+**Built with:** Next.js 14, Supabase, Judge0 API, Monaco Editor, chess.js, Polar.sh, Vercel
+
+**For:** CS students and developers who want a fun, competitive way to practice coding problems with friends — with real stakes, real pressure, and real skill building.
+
+**Why it's valuable:** LeetCode is a solo grind. KnightCode makes coding practice competitive, social, and actually fun.
 
 ---
 
