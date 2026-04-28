@@ -8,7 +8,7 @@ export function generateRoomCode(): string {
   ).join("");
 }
 
-export async function createGame(playerId: string, timeLimitSeconds = 180, difficulty = "easy"): Promise<Game> {
+export async function createGame(playerId: string, timeLimitSeconds = 180, difficulty = "easy", isRanked = false): Promise<Game> {
   const roomCode = generateRoomCode();
   const { data, error } = await supabase
     .from("games")
@@ -18,6 +18,7 @@ export async function createGame(playerId: string, timeLimitSeconds = 180, diffi
       status: "waiting",
       time_limit_seconds: timeLimitSeconds,
       difficulty,
+      is_ranked: isRanked,
     })
     .select()
     .single();

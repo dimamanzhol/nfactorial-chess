@@ -13,6 +13,8 @@ export interface Game {
   winner: Color | "draw" | null;
   time_limit_seconds: number;
   difficulty: string;
+  is_ranked: boolean;
+  elo_updated: boolean;
   created_at: string;
   updated_at: string;
 }

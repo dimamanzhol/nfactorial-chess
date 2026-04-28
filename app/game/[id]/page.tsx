@@ -10,6 +10,7 @@ export default async function GamePage({
   const { id } = await params;
 
   let isPro = false;
+  let isRanked = false;
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -19,7 +20,6 @@ export default async function GamePage({
     );
     const { data } = await supabase.auth.getUser();
     if (data.user) {
-      // Use the authenticated server client so RLS allows reading own profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("is_pro")
@@ -27,9 +27,15 @@ export default async function GamePage({
         .single();
       isPro = profile?.is_pro ?? false;
     }
+    const { data: game } = await supabase
+      .from("games")
+      .select("is_ranked")
+      .eq("id", id)
+      .single();
+    isRanked = game?.is_ranked ?? false;
   } catch {
     // unauthenticated or SSR issue — default to free
   }
 
-  return <GameRoom gameId={id} isPro={isPro} />;
+  return <GameRoom gameId={id} isPro={isPro} isRanked={isRanked} />;
 }

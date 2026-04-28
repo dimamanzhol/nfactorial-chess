@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getPlayerId, signOut, supabase } from "@/lib/supabase";
 import { createGame, joinGame } from "@/lib/game";
 import { getProfile } from "@/lib/subscription";
+import { joinQueue, cancelQueue } from "@/lib/matchmaking";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
@@ -25,8 +26,14 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isPro, setIsPro] = useState(false);
+  const [elo, setElo] = useState<number | null>(null);
   const [timeLimit, setTimeLimit] = useState(180);
   const [difficulty, setDifficulty] = useState("easy");
+  const [searching, setSearching] = useState(false);
+  const [searchElapsed, setSearchElapsed] = useState(0);
+  const queueEntryIdRef = useRef<string | null>(null);
+  const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const searchElapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -34,17 +41,27 @@ export default function HomePage() {
       if (data.user) {
         const profile = await getProfile(data.user.id);
         setIsPro(profile.is_pro);
+        setElo(profile.elo);
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        getProfile(session.user.id).then((p) => setIsPro(p.is_pro));
+        getProfile(session.user.id).then((p) => { setIsPro(p.is_pro); setElo(p.elo); });
       } else {
         setIsPro(false);
+        setElo(null);
       }
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Cleanup matchmaking intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+      if (searchElapsedIntervalRef.current) clearInterval(searchElapsedIntervalRef.current);
+    };
   }, []);
 
   async function handleCreate() {
@@ -87,6 +104,102 @@ export default function HomePage() {
     }
   }
 
+  async function handleFindOpponent() {
+    setError("");
+    setSearching(true);
+    setSearchElapsed(0);
+    try {
+      const userId = await getPlayerId();
+      const playerElo = elo ?? 1200;
+      const entryId = await joinQueue(userId, playerElo);
+      queueEntryIdRef.current = entryId;
+
+      // Elapsed timer
+      searchElapsedIntervalRef.current = setInterval(() => {
+        setSearchElapsed((s) => s + 1);
+      }, 1000);
+
+      // Poll every 2s: first check if own entry is already matched (handles being the "white" player),
+      // then try to match against another waiting player (handles being the "black" player).
+      searchIntervalRef.current = setInterval(async () => {
+        try {
+          // 1. Check own entry — covers the case where the opponent matched us first
+          const { data: ownEntry } = await supabase
+            .from("matchmaking")
+            .select("status, game_id")
+            .eq("id", entryId)
+            .single();
+
+          if (ownEntry?.status === "matched" && ownEntry.game_id) {
+            clearInterval(searchIntervalRef.current!);
+            clearInterval(searchElapsedIntervalRef.current!);
+            setSearching(false);
+            const { data: gameRow } = await supabase
+              .from("games")
+              .select("player_white")
+              .eq("id", ownEntry.game_id)
+              .single();
+            const color = gameRow?.player_white === userId ? "white" : "black";
+            router.push(`/game/${ownEntry.game_id}?color=${color}`);
+            return;
+          }
+
+          // 2. Try to match against a waiting opponent
+          const res = await fetch("/api/matchmaking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: userId, entryId, elo: playerElo }),
+          });
+          const data = await res.json() as { matched: boolean; gameId?: string };
+          if (data.matched && data.gameId) {
+            clearInterval(searchIntervalRef.current!);
+            clearInterval(searchElapsedIntervalRef.current!);
+            setSearching(false);
+            router.push(`/game/${data.gameId}?color=black`);
+          }
+        } catch { /* keep polling */ }
+      }, 2000);
+
+      // Also subscribe via Realtime for instant notification
+      const channel = supabase
+        .channel(`matchmaking:${entryId}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matchmaking", filter: `id=eq.${entryId}` },
+          async (payload) => {
+            const row = payload.new as { status: string; game_id: string | null };
+            if (row.status === "matched" && row.game_id) {
+              clearInterval(searchIntervalRef.current!);
+              clearInterval(searchElapsedIntervalRef.current!);
+              supabase.removeChannel(channel);
+              setSearching(false);
+              // Determine color by checking whether we are white or black in the game
+              const { data: gameRow } = await supabase
+                .from("games")
+                .select("player_white")
+                .eq("id", row.game_id)
+                .single();
+              const color = gameRow?.player_white === userId ? "white" : "black";
+              router.push(`/game/${row.game_id}?color=${color}`);
+            }
+          })
+        .subscribe();
+    } catch (e) {
+      setSearching(false);
+      setError(e instanceof Error ? e.message : "Failed to join queue");
+    }
+  }
+
+  async function handleCancelSearch() {
+    if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+    if (searchElapsedIntervalRef.current) clearInterval(searchElapsedIntervalRef.current);
+    setSearching(false);
+    setSearchElapsed(0);
+    try {
+      const userId = await getPlayerId();
+      await cancelQueue(userId);
+    } catch { /* ignore */ }
+    queueEntryIdRef.current = null;
+  }
+
   async function handleSignOut() {
     await signOut();
     router.refresh();
@@ -125,6 +238,15 @@ export default function HomePage() {
               >
                 Pro →
               </a>
+            )}
+            {elo !== null && (
+              <span style={{
+                fontSize: 12, color: T.textSec,
+                fontFamily: "var(--font-geist-mono), monospace",
+                border: `1px solid ${T.border}`, borderRadius: 6, padding: "3px 8px",
+              }}>
+                {elo} ELO
+              </span>
             )}
             <span style={{ fontSize: 13, color: T.textSec }}>{user.email}</span>
             <button
@@ -331,6 +453,69 @@ export default function HomePage() {
               {joining ? "Joining…" : "Join Game"}
             </button>
           </div>
+
+          {/* Ranked matchmaking divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <span style={{ fontSize: 12, color: T.textMut }}>or play ranked</span>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+          </div>
+
+          {searching ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{
+                padding: "14px 20px",
+                background: T.bgAlt,
+                border: `1.5px solid ${T.border}`,
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <span style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>
+                  Searching… {Math.floor(searchElapsed / 60)}:{(searchElapsed % 60).toString().padStart(2, "0")}
+                </span>
+                <span style={{ fontSize: 12, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace" }}>
+                  {elo ?? 1200} ELO
+                </span>
+              </div>
+              <button
+                onClick={handleCancelSearch}
+                style={{
+                  padding: "10px 24px",
+                  background: "transparent",
+                  color: T.textSec,
+                  border: `1.5px solid ${T.border}`,
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleFindOpponent}
+              disabled={!user}
+              style={{
+                padding: "12px 24px",
+                background: T.bgAlt,
+                color: user ? T.text : T.textMut,
+                border: `1.5px solid ${T.border}`,
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: user ? "pointer" : "not-allowed",
+                letterSpacing: "-0.01em",
+                fontFamily: "inherit",
+              }}
+            >
+              {user ? "Find Opponent (Ranked)" : "Sign in to play ranked"}
+            </button>
+          )}
 
           {error && (
             <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>{error}</p>

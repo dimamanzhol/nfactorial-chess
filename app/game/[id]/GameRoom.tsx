@@ -380,7 +380,7 @@ function InfoPanel({
 }
 
 // ─── Main Game Room ────────────────────────────────────────────────────────
-export default function GameRoom({ gameId, isPro = false }: { gameId: string; isPro?: boolean }) {
+export default function GameRoom({ gameId, isPro = false, isRanked = false }: { gameId: string; isPro?: boolean; isRanked?: boolean }) {
   const searchParams = useSearchParams();
   const myColor = (searchParams.get("color") ?? "white") as Color;
 
@@ -393,6 +393,7 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Record<string, React.CSSProperties>>({});
   const [gameOver, setGameOver] = useState<{ winner: string | null; reason: string } | null>(null);
+  const [eloResult, setEloResult] = useState<{ change: number } | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
   const boardRef = useRef<HTMLDivElement>(null);
   const turnNumberRef = useRef(myColor === "white" ? 1 : 2);
@@ -425,6 +426,7 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
           try { chess.load(updated.fen); setFen(updated.fen); } catch { /**/ }
           if (updated.status === "finished") {
             setGameOver({ winner: updated.winner, reason: updated.winner ? "checkmate" : "draw" });
+            if (isRanked) triggerEloUpdate(updated.winner, updated.id);
           }
         })
       .subscribe();
@@ -439,7 +441,22 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
     try { chess.load((data as Game).fen); setFen((data as Game).fen); } catch { /**/ }
     if ((data as Game).status === "finished") {
       setGameOver({ winner: (data as Game).winner, reason: "finished" });
+      if (isRanked) triggerEloUpdate((data as Game).winner, gameId);
     }
+  }
+
+  async function triggerEloUpdate(winner: string | null, gid: string) {
+    try {
+      const res = await fetch("/api/elo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: gid, winner: winner ?? "draw" }),
+      });
+      if (!res.ok) return;
+      const result = await res.json() as { whiteChange: number; blackChange: number };
+      const change = myColor === "white" ? result.whiteChange : result.blackChange;
+      setEloResult({ change });
+    } catch { /* non-critical */ }
   }
 
   const isMyTurn = game?.current_turn === myColor && game?.status === "active";
@@ -513,8 +530,10 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
         });
         turnNumberRef.current += 2;
       }
-      if (isOver) setGameOver({ winner, reason: chess.isCheckmate() ? "checkmate" : "draw" });
-      else setStatusMsg("Move played — waiting for opponent.");
+      if (isOver) {
+        setGameOver({ winner, reason: chess.isCheckmate() ? "checkmate" : "draw" });
+        if (isRanked) triggerEloUpdate(winner, gameId);
+      } else setStatusMsg("Move played — waiting for opponent.");
     } catch { setStatusMsg("Move failed."); }
   }, [pendingMove, game, activeProblem, chess, myColor, gameId]);
 
@@ -575,7 +594,7 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
           KnightCode
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <span style={{ fontSize: 12, color: T.textMut }}>vs friend</span>
+          <span style={{ fontSize: 12, color: isRanked ? T.green : T.textMut }}>{isRanked ? "ranked" : "vs friend"}</span>
           <a href="/" style={{ fontSize: 13, color: T.textMut, textDecoration: "none" }}>← Leave</a>
         </div>
       </nav>
@@ -714,9 +733,18 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
             <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 8, color: T.text }}>
               {gameOver.winner === myColor ? "You won." : gameOver.winner ? "You lost." : "Draw."}
             </h2>
-            <p style={{ fontSize: 14, color: T.textSec, marginBottom: 36 }}>
+            <p style={{ fontSize: 14, color: T.textSec, marginBottom: eloResult ? 16 : 36 }}>
               {gameOver.reason === "checkmate" ? "Checkmate." : "Game finished."}
             </p>
+            {eloResult && (
+              <p style={{
+                fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em",
+                color: eloResult.change >= 0 ? T.green : T.red,
+                marginBottom: 28,
+              }}>
+                {eloResult.change >= 0 ? "+" : ""}{eloResult.change} ELO
+              </p>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button
                 onClick={async () => {

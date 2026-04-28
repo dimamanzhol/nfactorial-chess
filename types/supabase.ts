@@ -16,38 +16,77 @@ export type Database = {
         Row: {
           created_at: string
           current_turn: string
+          difficulty: string
+          elo_updated: boolean
           fen: string
           id: string
+          is_ranked: boolean
           player_black: string | null
           player_white: string | null
           room_code: string
           status: string
+          time_limit_seconds: number
           updated_at: string
           winner: string | null
         }
         Insert: {
           created_at?: string
           current_turn?: string
+          difficulty?: string
+          elo_updated?: boolean
           fen?: string
           id?: string
+          is_ranked?: boolean
           player_black?: string | null
           player_white?: string | null
           room_code: string
           status?: string
+          time_limit_seconds?: number
           updated_at?: string
           winner?: string | null
         }
         Update: {
           created_at?: string
           current_turn?: string
+          difficulty?: string
+          elo_updated?: boolean
           fen?: string
           id?: string
+          is_ranked?: boolean
           player_black?: string | null
           player_white?: string | null
           room_code?: string
           status?: string
+          time_limit_seconds?: number
           updated_at?: string
           winner?: string | null
+        }
+        Relationships: []
+      }
+      matchmaking: {
+        Row: {
+          id: string
+          player_id: string
+          elo: number
+          status: string
+          game_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          player_id: string
+          elo?: number
+          status?: string
+          game_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          player_id?: string
+          elo?: number
+          status?: string
+          game_id?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -145,18 +184,21 @@ export type Database = {
         Row: {
           id: string
           is_pro: boolean
+          elo: number
           polar_customer_id: string | null
           created_at: string
         }
         Insert: {
           id: string
           is_pro?: boolean
+          elo?: number
           polar_customer_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           is_pro?: boolean
+          elo?: number
           polar_customer_id?: string | null
           created_at?: string
         }
