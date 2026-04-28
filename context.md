@@ -309,10 +309,10 @@ Dark, clean, competitive. Think LeetCode meets Chess.com. Professional but with 
 
 **Polar.sh** for payments (no Stripe needed).
 
-| Plan | Price | What you get                                                              |
-| ---- | ----- | ------------------------------------------------------------------------- |
-| Free | $0    | 5 games/day, Easy problems, basic stats                                   |
-| Pro  | $7/mo | Unlimited games, Medium + Hard modes, full analytics, custom board themes |
+| Plan | Price | What you get                                                                             |
+| ---- | ----- | ---------------------------------------------------------------------------------------- |
+| Free | $0    | 5 games/day, Easy problems, basic stats                                                  |
+| Pro  | $7/mo | Unlimited games, Medium + Hard modes, full analytics, custom board themes, games history |
 
 "Upgrade to Pro" button visible in nav from day one.
 

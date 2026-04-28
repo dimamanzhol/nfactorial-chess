@@ -327,7 +327,7 @@ function InfoPanel({
 }
 
 // ─── Main Game Room ────────────────────────────────────────────────────────
-export default function GameRoom({ gameId }: { gameId: string }) {
+export default function GameRoom({ gameId, isPro = false }: { gameId: string; isPro?: boolean }) {
   const searchParams = useSearchParams();
   const myColor = (searchParams.get("color") ?? "white") as Color;
 
@@ -414,7 +414,7 @@ export default function GameRoom({ gameId }: { gameId: string }) {
     if (selectedSquare) {
       if (getLegalSquares(selectedSquare).includes(square)) {
         clearSelection();
-        openProblem(selectedSquare, square);
+        openProblem(selectedSquare, square, isPro);
         return;
       }
       if (piece?.color === myChessColor) { setSelection(square); return; }
@@ -423,9 +423,9 @@ export default function GameRoom({ gameId }: { gameId: string }) {
     if (piece?.color === myChessColor) setSelection(square);
   }
 
-  async function openProblem(from: string, to: string) {
+  async function openProblem(from: string, to: string, pro: boolean) {
     setPendingMove({ from, to });
-    const prob = await getRandomProblem();
+    const prob = await getRandomProblem(pro ? undefined : "easy");
     setActiveProblem(prob);
   }
 
@@ -471,7 +471,13 @@ export default function GameRoom({ gameId }: { gameId: string }) {
     setActiveProblem(null);
     setPendingMove(null);
     clearSelection();
-    await skipTurn(gameId, myColor);
+    // Flip the FEN turn so the opponent's chess.js instance returns legal moves
+    const fenParts = chess.fen().split(" ");
+    fenParts[1] = myColor === "white" ? "b" : "w";
+    const flippedFen = fenParts.join(" ");
+    chess.load(flippedFen);
+    setFen(flippedFen);
+    await skipTurn(gameId, myColor, flippedFen);
     if (prob) {
       await recordTurn({
         gameId,

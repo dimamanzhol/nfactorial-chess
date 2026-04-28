@@ -43,7 +43,16 @@ Faster solver earns the move. Fail in 3 min → turn skipped. Checkmate wins.
 - `games`: id, room_code, player_white, player_black, status, fen, current_turn, winner
 - `problems`: id, title, slug, difficulty, description, examples, constraints, test_cases, starter_code
 - `turns`: id, game_id, turn_number, player_color, player_id, problem_id, move_attempted, move_made, code_submitted, language, solved, time_taken_ms
+- `profiles`: id (→ auth.users), is_pro (bool), polar_customer_id, created_at — RLS enabled, auto-created on signup
 - Realtime enabled on `games` and `turns` tables
+
+## Monetization (Polar.sh)
+- Free: 5 games/day, Easy problems only, no history
+- Pro: unlimited games, all difficulties, game history
+- `lib/subscription.ts` — `getProfile(userId)` returns `{ is_pro, polar_customer_id }`
+- API routes: `/api/polar/checkout`, `/api/polar/portal`, `/api/polar/webhook`
+- `/pricing` page — Free/Pro cards
+- Env vars needed: `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `NEXT_PUBLIC_POLAR_PRODUCT_ID`, `NEXT_PUBLIC_APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
 ## Auth Approach
 Supabase email/password auth. `getPlayerId()` is async — returns auth user ID or random UUID fallback.

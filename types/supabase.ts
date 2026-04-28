@@ -141,6 +141,27 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          id: string
+          is_pro: boolean
+          polar_customer_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          is_pro?: boolean
+          polar_customer_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          is_pro?: boolean
+          polar_customer_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getUserGames, type GameSummary } from "@/lib/history";
+import { getProfile } from "@/lib/subscription";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
@@ -33,9 +34,14 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
         router.replace("/auth");
+        return;
+      }
+      const profile = await getProfile(data.user.id);
+      if (!profile.is_pro) {
+        router.replace("/pricing");
         return;
       }
       setUser(data.user);

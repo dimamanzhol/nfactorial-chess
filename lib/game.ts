@@ -86,12 +86,18 @@ export async function submitMove(
 
 export async function skipTurn(
   gameId: string,
-  currentTurn: "white" | "black"
+  currentTurn: "white" | "black",
+  currentFen: string
 ): Promise<void> {
   const nextTurn = currentTurn === "white" ? "black" : "white";
+  // Flip the active-color field in the FEN so chess.js on the other client
+  // returns legal moves for the correct color.
+  const fenParts = currentFen.split(" ");
+  fenParts[1] = nextTurn === "white" ? "w" : "b";
+  const newFen = fenParts.join(" ");
   const { error } = await supabase
     .from("games")
-    .update({ current_turn: nextTurn } as { current_turn: string })
+    .update({ current_turn: nextTurn, fen: newFen } as { current_turn: string; fen: string })
     .eq("id", gameId);
   if (error) throw new Error(error.message);
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getPlayerId, signOut, supabase } from "@/lib/supabase";
 import { createGame, joinGame } from "@/lib/game";
+import { getProfile } from "@/lib/subscription";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
@@ -23,11 +24,23 @@ export default function HomePage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(async ({ data }) => {
+      setUser(data.user);
+      if (data.user) {
+        const profile = await getProfile(data.user.id);
+        setIsPro(profile.is_pro);
+      }
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        getProfile(session.user.id).then((p) => setIsPro(p.is_pro));
+      } else {
+        setIsPro(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -36,7 +49,22 @@ export default function HomePage() {
     setCreating(true);
     setError("");
     try {
-      const game = await createGame(await getPlayerId());
+      const userId = await getPlayerId();
+      if (!isPro) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { count } = await supabase
+          .from("games")
+          .select("id", { count: "exact", head: true })
+          .eq("player_white", userId)
+          .gte("created_at", today.toISOString());
+        if ((count ?? 0) >= 5) {
+          setError("5-game daily limit reached. Upgrade to Pro →");
+          setCreating(false);
+          return;
+        }
+      }
+      const game = await createGame(userId);
       router.push(`/game/${game.id}?color=white`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create game");
@@ -88,6 +116,14 @@ export default function HomePage() {
             >
               History
             </a>
+            {!isPro && (
+              <a
+                href="/pricing"
+                style={{ fontSize: 12, color: "#16a34a", fontWeight: 700, textDecoration: "none", border: "1px solid #16a34a30", borderRadius: 6, padding: "3px 8px" }}
+              >
+                Pro →
+              </a>
+            )}
             <span style={{ fontSize: 13, color: T.textSec }}>{user.email}</span>
             <button
               onClick={handleSignOut}
