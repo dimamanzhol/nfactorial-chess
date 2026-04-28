@@ -25,6 +25,8 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isPro, setIsPro] = useState(false);
+  const [timeLimit, setTimeLimit] = useState(180);
+  const [difficulty, setDifficulty] = useState("easy");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -64,7 +66,7 @@ export default function HomePage() {
           return;
         }
       }
-      const game = await createGame(userId);
+      const game = await createGame(userId, isPro ? timeLimit : 180, isPro ? difficulty : "easy");
       router.push(`/game/${game.id}?color=white`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create game");
@@ -215,6 +217,59 @@ export default function HomePage() {
             <span style={{ fontSize: 12, color: T.textMut }}>or play with a friend</span>
             <div style={{ flex: 1, height: 1, background: T.border }} />
           </div>
+
+          {isPro && (
+            <div>
+              <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                Problem difficulty
+              </p>
+              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                {(["easy", "medium", "hard"] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDifficulty(d)}
+                    style={{
+                      flex: 1, padding: "8px 0",
+                      background: difficulty === d ? T.dark : T.bgAlt,
+                      color: difficulty === d ? "#fff" : T.textSec,
+                      border: `1.5px solid ${difficulty === d ? T.dark : T.border}`,
+                      borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "inherit",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isPro && (
+            <div>
+              <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                Time per turn
+              </p>
+              <div style={{ display: "flex", gap: 6 }}>
+                {([60, 180, 300] as const).map((secs) => (
+                  <button
+                    key={secs}
+                    onClick={() => setTimeLimit(secs)}
+                    style={{
+                      flex: 1, padding: "8px 0",
+                      background: timeLimit === secs ? T.dark : T.bgAlt,
+                      color: timeLimit === secs ? "#fff" : T.textSec,
+                      border: `1.5px solid ${timeLimit === secs ? T.dark : T.border}`,
+                      borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace",
+                    }}
+                  >
+                    {secs === 60 ? "1 min" : secs === 180 ? "3 min" : "5 min"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleCreate}

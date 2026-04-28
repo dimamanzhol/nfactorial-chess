@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Chess, type Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { supabase } from "@/lib/supabase";
-import { getRandomProblem, submitMove, skipTurn, runPyTests, recordTurn } from "@/lib/game";
+import { getRandomProblem, submitMove, skipTurn, runPyTests, runJSTests, recordTurn, createGame } from "@/lib/game";
 import { getPlayerId } from "@/lib/supabase";
 import type { Game, Problem, Color } from "@/types";
 import CodeEditor from "@/components/CodeEditor";
@@ -34,39 +34,55 @@ const DIFF_COLOR: Record<string, string> = {
   hard: T.red,
 };
 
-const TIMER_SECONDS = 180;
-
 function fmt(s: number) {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
+
+const LANGUAGES = [
+  { key: "python", label: "Python" },
+  { key: "javascript", label: "JavaScript" },
+];
 
 // ─── Problem Panel (inline right side) ────────────────────────────────────
 function ProblemPanel({
   problem,
   moveAttempted,
+  timerSeconds,
+  isPro,
   onSolved,
   onFailed,
 }: {
   problem: Problem;
   moveAttempted: string;
-  onSolved: (code: string, timeTakenMs: number) => void;
-  onFailed: (code: string, timeTakenMs: number) => void;
+  timerSeconds: number;
+  isPro: boolean;
+  onSolved: (code: string, language: string, timeTakenMs: number) => void;
+  onFailed: (code: string, language: string, timeTakenMs: number) => void;
 }) {
+  const [lang, setLang] = useState("python");
   const [code, setCode] = useState(problem.starter_code["python"] ?? "");
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(timerSeconds);
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<{ passed: boolean; message: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(Date.now());
   const codeRef = useRef(code);
+  const langRef = useRef(lang);
   codeRef.current = code;
+  langRef.current = lang;
+
+  function switchLang(newLang: string) {
+    setLang(newLang);
+    setCode(problem.starter_code[newLang] ?? "");
+    setOutput(null);
+  }
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          onFailed(codeRef.current, Date.now() - startTimeRef.current);
+          onFailed(codeRef.current, langRef.current, Date.now() - startTimeRef.current);
           return 0;
         }
         return t - 1;
@@ -78,17 +94,20 @@ function ProblemPanel({
   async function handleRun() {
     setRunning(true);
     setOutput(null);
-    const result = await runPyTests(code, problem.test_cases as Array<{ input: Record<string, unknown>; expected: unknown }>);
+    const tcs = problem.test_cases as Array<{ input: Record<string, unknown>; expected: unknown }>;
+    const result = lang === "javascript"
+      ? runJSTests(code, tcs)
+      : await runPyTests(code, tcs);
     if (result.passed) {
       setOutput({ passed: true, message: "All test cases passed!" });
       clearInterval(timerRef.current!);
       const elapsed = Date.now() - startTimeRef.current;
-      setTimeout(() => onSolved(code, elapsed), 600);
+      setTimeout(() => onSolved(code, lang, elapsed), 600);
     } else if (result.failedCase) {
       const { input, expected, got } = result.failedCase;
       setOutput({ passed: false, message: `Input: ${JSON.stringify(input)} → got ${JSON.stringify(got)}, expected ${JSON.stringify(expected)}` });
     } else {
-      setOutput({ passed: false, message: "Error in your code — check the console." });
+      setOutput({ passed: false, message: result.error ?? "Error in your code." });
     }
     setRunning(false);
   }
@@ -160,8 +179,41 @@ function ProblemPanel({
         )}
       </div>
 
-      {/* Code editor */}
+      {/* Language selector + code editor */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", background: T.editorBg, overflow: "hidden", minHeight: 0 }}>
+        <div style={{ display: "flex", gap: 4, padding: "8px 12px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          {LANGUAGES.filter((l) => isPro || l.key === "python").map((l) => (
+            <button
+              key={l.key}
+              onClick={() => switchLang(l.key)}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11, fontFamily: "var(--font-geist-mono), monospace",
+                fontWeight: 600, letterSpacing: "0.04em",
+                background: lang === l.key ? T.text : "transparent",
+                color: lang === l.key ? "#fff" : T.textMut,
+                border: `1px solid ${lang === l.key ? T.text : T.border}`,
+                borderRadius: 6, cursor: "pointer",
+              }}
+            >
+              {l.label}
+            </button>
+          ))}
+          {!isPro && (
+            <a
+              href="/pricing"
+              style={{
+                padding: "4px 10px", fontSize: 11,
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontWeight: 600, letterSpacing: "0.04em",
+                color: T.green, border: `1px solid ${T.green}40`,
+                borderRadius: 6, textDecoration: "none",
+              }}
+            >
+              JS — Pro →
+            </a>
+          )}
+        </div>
         <CodeEditor value={code} onChange={setCode} />
       </div>
 
@@ -198,7 +250,7 @@ function ProblemPanel({
             {running ? "Running…" : "Run & Submit"}
           </button>
           <button
-            onClick={() => onFailed(codeRef.current, Date.now() - startTimeRef.current)}
+            onClick={() => onFailed(codeRef.current, langRef.current, Date.now() - startTimeRef.current)}
             style={{
               padding: "10px 14px",
               background: "transparent", color: T.textMut,
@@ -246,6 +298,7 @@ function InfoPanel({
             { label: "Status", value: game?.status ?? "loading", highlight: game?.status === "active" ? T.green : game?.status === "waiting" ? T.yellow : undefined },
             { label: "Current turn", value: game?.current_turn ?? "—" },
             { label: "You play", value: myColor },
+            { label: "Difficulty", value: game?.difficulty ?? "easy" },
           ].map(({ label, value, highlight }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 13, color: T.textSec }}>{label}</span>
@@ -414,7 +467,7 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
     if (selectedSquare) {
       if (getLegalSquares(selectedSquare).includes(square)) {
         clearSelection();
-        openProblem(selectedSquare, square, isPro);
+        openProblem(selectedSquare, square);
         return;
       }
       if (piece?.color === myChessColor) { setSelection(square); return; }
@@ -423,13 +476,14 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
     if (piece?.color === myChessColor) setSelection(square);
   }
 
-  async function openProblem(from: string, to: string, pro: boolean) {
+  async function openProblem(from: string, to: string) {
     setPendingMove({ from, to });
-    const prob = await getRandomProblem(pro ? undefined : "easy");
+    const diff = game?.difficulty ?? "easy";
+    const prob = await getRandomProblem(diff === "any" ? undefined : diff);
     setActiveProblem(prob);
   }
 
-  const handleProblemSolved = useCallback(async (code: string, timeTakenMs: number) => {
+  const handleProblemSolved = useCallback(async (code: string, language: string, timeTakenMs: number) => {
     if (!pendingMove || !game) return;
     const prob = activeProblem;
     setActiveProblem(null);
@@ -453,18 +507,18 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
           moveAttempted: `${from} → ${to}`,
           moveMade: result.san,
           codeSubmitted: code,
-          language: "python",
+          language,
           solved: true,
           timeTakenMs,
         });
-        turnNumberRef.current += 2; // each player increments by 2 (white=odd, black=even)
+        turnNumberRef.current += 2;
       }
       if (isOver) setGameOver({ winner, reason: chess.isCheckmate() ? "checkmate" : "draw" });
       else setStatusMsg("Move played — waiting for opponent.");
     } catch { setStatusMsg("Move failed."); }
   }, [pendingMove, game, activeProblem, chess, myColor, gameId]);
 
-  const handleProblemFailed = useCallback(async (code: string, timeTakenMs: number) => {
+  const handleProblemFailed = useCallback(async (code: string, language: string, timeTakenMs: number) => {
     if (!game) return;
     const prob = activeProblem;
     const move = pendingMove;
@@ -488,7 +542,7 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
         moveAttempted: move ? `${move.from} → ${move.to}` : null,
         moveMade: null,
         codeSubmitted: code,
-        language: "python",
+        language,
         solved: false,
         timeTakenMs,
       });
@@ -626,6 +680,8 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
             <ProblemPanel
               problem={activeProblem}
               moveAttempted={`${pendingMove.from} → ${pendingMove.to}`}
+              timerSeconds={game?.time_limit_seconds ?? 180}
+              isPro={isPro}
               onSolved={handleProblemSolved}
               onFailed={handleProblemFailed}
             />
@@ -661,14 +717,34 @@ export default function GameRoom({ gameId, isPro = false }: { gameId: string; is
             <p style={{ fontSize: 14, color: T.textSec, marginBottom: 36 }}>
               {gameOver.reason === "checkmate" ? "Checkmate." : "Game finished."}
             </p>
-            <a href="/" style={{
-              display: "inline-block", padding: "12px 32px",
-              background: T.text, color: "#f7f3ee",
-              borderRadius: 10, textDecoration: "none",
-              fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em",
-            }}>
-              Play again →
-            </a>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                onClick={async () => {
+                  const userId = playerIdRef.current;
+                  if (!userId) return;
+                  const newGame = await createGame(userId, game?.time_limit_seconds ?? 180);
+                  const newColor = myColor === "white" ? "black" : "white";
+                  window.location.href = `/game/${newGame.id}?color=${newColor}`;
+                }}
+                style={{
+                  padding: "12px 24px",
+                  background: T.text, color: "#f7f3ee",
+                  border: "none", borderRadius: 10,
+                  fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                Rematch →
+              </button>
+              <a href="/" style={{
+                display: "inline-flex", alignItems: "center", padding: "12px 24px",
+                background: "transparent", color: T.textSec,
+                border: `1px solid ${T.border}`, borderRadius: 10,
+                textDecoration: "none", fontSize: 14, fontWeight: 500,
+              }}>
+                Home
+              </a>
+            </div>
           </div>
         </div>
       )}

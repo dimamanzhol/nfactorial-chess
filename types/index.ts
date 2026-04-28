@@ -11,6 +11,8 @@ export interface Game {
   fen: string;
   current_turn: Color;
   winner: Color | "draw" | null;
+  time_limit_seconds: number;
+  difficulty: string;
   created_at: string;
   updated_at: string;
 }

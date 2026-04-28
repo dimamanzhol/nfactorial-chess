@@ -30,11 +30,17 @@ function PricingContent() {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user);
       if (data.user) {
+        // If coming back from a successful checkout, verify and activate Pro
+        const checkoutId = searchParams.get("checkoutId");
+        if (success && checkoutId) {
+          await fetch(`/api/polar/verify-checkout?checkoutId=${checkoutId}`);
+        }
         const profile = await getProfile(data.user.id);
         setIsPro(profile.is_pro);
       }
       setLoading(false);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const upgradeUrl = user

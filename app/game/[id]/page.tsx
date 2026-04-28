@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import GameRoom from "./GameRoom";
-import { getProfile } from "@/lib/subscription";
 
 export default async function GamePage({
   params,
@@ -20,8 +19,13 @@ export default async function GamePage({
     );
     const { data } = await supabase.auth.getUser();
     if (data.user) {
-      const profile = await getProfile(data.user.id);
-      isPro = profile.is_pro;
+      // Use the authenticated server client so RLS allows reading own profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_pro")
+        .eq("id", data.user.id)
+        .single();
+      isPro = profile?.is_pro ?? false;
     }
   } catch {
     // unauthenticated or SSR issue — default to free

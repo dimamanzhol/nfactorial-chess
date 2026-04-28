@@ -8,7 +8,7 @@ export function generateRoomCode(): string {
   ).join("");
 }
 
-export async function createGame(playerId: string): Promise<Game> {
+export async function createGame(playerId: string, timeLimitSeconds = 180, difficulty = "easy"): Promise<Game> {
   const roomCode = generateRoomCode();
   const { data, error } = await supabase
     .from("games")
@@ -16,6 +16,8 @@ export async function createGame(playerId: string): Promise<Game> {
       room_code: roomCode,
       player_white: playerId,
       status: "waiting",
+      time_limit_seconds: timeLimitSeconds,
+      difficulty,
     })
     .select()
     .single();
@@ -133,6 +135,33 @@ export async function recordTurn(params: {
 }
 
 /**
+ * Run JavaScript code against test cases using new Function().
+ * Expects the code to define a named function; calls it with each test case's args.
+ */
+export function runJSTests(
+  code: string,
+  testCases: Array<{ input: Record<string, unknown>; expected: unknown }>
+): { passed: boolean; error?: string; failedCase?: { input: unknown; expected: unknown; got: unknown } } {
+  try {
+    const fnMatch = code.match(/function\s+(\w+)\s*\(/) ?? code.match(/(?:const|let|var)\s+(\w+)\s*=/);
+    if (!fnMatch) return { passed: false, error: "No function definition found." };
+    const fnName = fnMatch[1];
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(`${code}\nreturn ${fnName};`)() as (...args: unknown[]) => unknown;
+    for (const tc of testCases) {
+      const args = Object.values(tc.input);
+      const got = fn(...args);
+      if (JSON.stringify(got) !== JSON.stringify(tc.expected)) {
+        return { passed: false, failedCase: { input: tc.input, expected: tc.expected, got } };
+      }
+    }
+    return { passed: true };
+  } catch (e) {
+    return { passed: false, error: String(e) };
+  }
+}
+
+/**
  * Run Python code against test cases using Pyodide (in-browser WASM).
  * Expects the code to define a function; calls it with each test case's args.
  */
@@ -141,31 +170,33 @@ export async function runPyTests(
   testCases: Array<{ input: Record<string, unknown>; expected: unknown }>
 ): Promise<{
   passed: boolean;
+  error?: string;
   failedCase?: { input: unknown; expected: unknown; got: unknown };
 }> {
   try {
     // @ts-expect-error — Pyodide loaded via CDN script tag
     const pyodide = await window.__pyodidePromise;
 
-    // Extract function name from def statement
     const fnMatch = code.match(/^def\s+(\w+)\s*\(/m);
-    if (!fnMatch) return { passed: false };
+    if (!fnMatch) return { passed: false, error: "No function definition found. Make sure your code starts with 'def function_name(...)'." };
     const fnName = fnMatch[1];
 
     await pyodide.runPythonAsync(code);
-    const fn = pyodide.globals.get(fnName);
 
     for (const tc of testCases) {
-      const args = Object.values(tc.input);
-      const result = fn(...args);
-      // Convert Pyodide proxy to JS value if needed
-      const got = result?.toJs ? result.toJs({ dict_converter: Object.fromEntries }) : result;
+      // Pass args as a JSON string into Python globals, then parse + unpack there.
+      // This avoids all JS→Python proxy conversion issues.
+      pyodide.globals.set("__args_json", JSON.stringify(Object.values(tc.input)));
+      const resultJson: string = await pyodide.runPythonAsync(
+        `import json as __json\n__result = ${fnName}(*__json.loads(__args_json))\n__json.dumps(__result)`
+      );
+      const got = JSON.parse(resultJson);
       if (JSON.stringify(got) !== JSON.stringify(tc.expected)) {
         return { passed: false, failedCase: { input: tc.input, expected: tc.expected, got } };
       }
     }
     return { passed: true };
-  } catch {
-    return { passed: false };
+  } catch (e) {
+    return { passed: false, error: String(e) };
   }
 }
