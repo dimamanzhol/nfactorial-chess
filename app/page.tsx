@@ -1,213 +1,91 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getPlayerId, signOut, supabase } from "@/lib/supabase";
-import { createGame, joinGame } from "@/lib/game";
-import { getProfile } from "@/lib/subscription";
-import { joinQueue, cancelQueue } from "@/lib/matchmaking";
-import type { User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 const T = {
-  bg: "#f7f3ee",
-  bgAlt: "#efebe4",
-  text: "#0f0f0d",
-  textSec: "#6e6e62",
-  textMut: "#9e9e92",
-  border: "#e5e1d8",
-  dark: "#0f0f0d",
+  bg:           "#0d0a1a",
+  surface:      "#13102a",
+  surfaceAlt:   "#1f1640",
+  border:       "#2d2250",
+  accent:       "#7c3aed",
+  accentBright: "#a78bfa",
+  text:         "#e8e0f5",
+  textSec:      "#a89cc8",
+  textMut:      "#5e4f8a",
+  green:        "#22c55e",
+  gold:         "#f59e0b",
 };
 
-export default function HomePage() {
+const PIXEL = "var(--font-pixel), monospace";
+const MONO  = "var(--font-geist-mono), monospace";
+const VT    = "var(--font-vt), monospace";
+
+const STEPS = [
+  {
+    n: "01",
+    icon: "♟",
+    title: "PICK YOUR MOVE",
+    body: "Select a chess piece and choose where to move it on the board.",
+  },
+  {
+    n: "02",
+    icon: "⌨",
+    title: "SOLVE TO UNLOCK",
+    body: "A coding problem appears. Solve it before the timer runs out to execute your move.",
+  },
+  {
+    n: "03",
+    icon: "♛",
+    title: "EARN THE POSITION",
+    body: "Faster coders get better positions. Checkmate your opponent to win the game.",
+  },
+];
+
+const MODES = [
+  {
+    img: "/mfking.png",
+    color: T.accent,
+    colorDim: `${T.accent}30`,
+    title: "VS AI",
+    sub: "SINGLE PLAYER",
+    desc: "Practise coding problems and chess strategy against our adaptive AI opponent.",
+    cta: "PLAY NOW →",
+  },
+  {
+    img: "/knight-pfp.png",
+    color: T.green,
+    colorDim: `${T.green}25`,
+    title: "VS FRIEND",
+    sub: "MULTIPLAYER",
+    desc: "Challenge a friend in real time with a private room code. May the best coder win.",
+    cta: "PLAY NOW →",
+  },
+  {
+    img: "/queen.png",
+    color: T.gold,
+    colorDim: `${T.gold}25`,
+    title: "RANKED ARENA",
+    sub: "COMPETITIVE",
+    desc: "Auto-match against players of similar ELO. Climb the leaderboard and earn your rank.",
+    cta: "PLAY NOW →",
+  },
+];
+
+export default function LandingPage() {
   const router = useRouter();
-  const [roomCode, setRoomCode] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState("");
-  const [user, setUser] = useState<User | null>(null);
-  const [isPro, setIsPro] = useState(false);
-  const [elo, setElo] = useState<number | null>(null);
-  const [timeLimit, setTimeLimit] = useState(180);
-  const [difficulty, setDifficulty] = useState("easy");
-  const [searching, setSearching] = useState(false);
-  const [searchElapsed, setSearchElapsed] = useState(0);
-  const queueEntryIdRef = useRef<string | null>(null);
-  const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const searchElapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      setUser(data.user);
-      if (data.user) {
-        const profile = await getProfile(data.user.id);
-        setIsPro(profile.is_pro);
-        setElo(profile.elo);
-      }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) router.replace("/dashboard/play");
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getProfile(session.user.id).then((p) => { setIsPro(p.is_pro); setElo(p.elo); });
-      } else {
-        setIsPro(false);
-        setElo(null);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Cleanup matchmaking intervals on unmount
-  useEffect(() => {
-    return () => {
-      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
-      if (searchElapsedIntervalRef.current) clearInterval(searchElapsedIntervalRef.current);
-    };
-  }, []);
-
-  async function handleCreate() {
-    setCreating(true);
-    setError("");
-    try {
-      const userId = await getPlayerId();
-      if (!isPro) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const { count } = await supabase
-          .from("games")
-          .select("id", { count: "exact", head: true })
-          .eq("player_white", userId)
-          .gte("created_at", today.toISOString());
-        if ((count ?? 0) >= 5) {
-          setError("5-game daily limit reached. Upgrade to Pro →");
-          setCreating(false);
-          return;
-        }
-      }
-      const game = await createGame(userId, isPro ? timeLimit : 180, isPro ? difficulty : "easy");
-      router.push(`/game/${game.id}?color=white`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create game");
-      setCreating(false);
-    }
-  }
-
-  async function handleJoin() {
-    if (roomCode.length < 6) { setError("Enter a 6-character room code"); return; }
-    setJoining(true);
-    setError("");
-    try {
-      const game = await joinGame(roomCode, await getPlayerId());
-      router.push(`/game/${game.id}?color=black`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Game not found");
-      setJoining(false);
-    }
-  }
-
-  async function handleFindOpponent() {
-    setError("");
-    setSearching(true);
-    setSearchElapsed(0);
-    try {
-      const userId = await getPlayerId();
-      const playerElo = elo ?? 1200;
-      const entryId = await joinQueue(userId, playerElo);
-      queueEntryIdRef.current = entryId;
-
-      // Elapsed timer
-      searchElapsedIntervalRef.current = setInterval(() => {
-        setSearchElapsed((s) => s + 1);
-      }, 1000);
-
-      // Poll every 2s: first check if own entry is already matched (handles being the "white" player),
-      // then try to match against another waiting player (handles being the "black" player).
-      searchIntervalRef.current = setInterval(async () => {
-        try {
-          // 1. Check own entry — covers the case where the opponent matched us first
-          const { data: ownEntry } = await supabase
-            .from("matchmaking")
-            .select("status, game_id")
-            .eq("id", entryId)
-            .single();
-
-          if (ownEntry?.status === "matched" && ownEntry.game_id) {
-            clearInterval(searchIntervalRef.current!);
-            clearInterval(searchElapsedIntervalRef.current!);
-            setSearching(false);
-            const { data: gameRow } = await supabase
-              .from("games")
-              .select("player_white")
-              .eq("id", ownEntry.game_id)
-              .single();
-            const color = gameRow?.player_white === userId ? "white" : "black";
-            router.push(`/game/${ownEntry.game_id}?color=${color}`);
-            return;
-          }
-
-          // 2. Try to match against a waiting opponent
-          const res = await fetch("/api/matchmaking", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: userId, entryId, elo: playerElo }),
-          });
-          const data = await res.json() as { matched: boolean; gameId?: string };
-          if (data.matched && data.gameId) {
-            clearInterval(searchIntervalRef.current!);
-            clearInterval(searchElapsedIntervalRef.current!);
-            setSearching(false);
-            router.push(`/game/${data.gameId}?color=black`);
-          }
-        } catch { /* keep polling */ }
-      }, 2000);
-
-      // Also subscribe via Realtime for instant notification
-      const channel = supabase
-        .channel(`matchmaking:${entryId}`)
-        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matchmaking", filter: `id=eq.${entryId}` },
-          async (payload) => {
-            const row = payload.new as { status: string; game_id: string | null };
-            if (row.status === "matched" && row.game_id) {
-              clearInterval(searchIntervalRef.current!);
-              clearInterval(searchElapsedIntervalRef.current!);
-              supabase.removeChannel(channel);
-              setSearching(false);
-              // Determine color by checking whether we are white or black in the game
-              const { data: gameRow } = await supabase
-                .from("games")
-                .select("player_white")
-                .eq("id", row.game_id)
-                .single();
-              const color = gameRow?.player_white === userId ? "white" : "black";
-              router.push(`/game/${row.game_id}?color=${color}`);
-            }
-          })
-        .subscribe();
-    } catch (e) {
-      setSearching(false);
-      setError(e instanceof Error ? e.message : "Failed to join queue");
-    }
-  }
-
-  async function handleCancelSearch() {
-    if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
-    if (searchElapsedIntervalRef.current) clearInterval(searchElapsedIntervalRef.current);
-    setSearching(false);
-    setSearchElapsed(0);
-    try {
-      const userId = await getPlayerId();
-      await cancelQueue(userId);
-    } catch { /* ignore */ }
-    queueEntryIdRef.current = null;
-  }
-
-  async function handleSignOut() {
-    await signOut();
-    router.refresh();
-  }
+  }, [router]);
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
-      {/* Nav */}
+    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "var(--font-geist), system-ui, sans-serif", overflowX: "hidden" }}>
+
+      {/* ── Nav ── */}
       <nav style={{
         borderBottom: `1px solid ${T.border}`,
         padding: "0 40px",
@@ -220,336 +98,169 @@ export default function HomePage() {
         background: T.bg,
         zIndex: 10,
       }}>
-        <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em", color: T.text }}>
-          KnightCode
-        </span>
-        {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <a
-              href="/history"
-              style={{ fontSize: 13, color: T.textSec, textDecoration: "none" }}
-            >
-              History
-            </a>
-            {!isPro && (
-              <a
-                href="/pricing"
-                style={{ fontSize: 12, color: "#16a34a", fontWeight: 700, textDecoration: "none", border: "1px solid #16a34a30", borderRadius: 6, padding: "3px 8px" }}
-              >
-                Pro →
-              </a>
-            )}
-            {elo !== null && (
-              <span style={{
-                fontSize: 12, color: T.textSec,
-                fontFamily: "var(--font-geist-mono), monospace",
-                border: `1px solid ${T.border}`, borderRadius: 6, padding: "3px 8px",
-              }}>
-                {elo} ELO
-              </span>
-            )}
-            <span style={{ fontSize: 13, color: T.textSec }}>{user.email}</span>
-            <button
-              onClick={handleSignOut}
-              style={{
-                fontSize: 13,
-                color: T.textSec,
-                background: "none",
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                padding: "5px 12px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        ) : (
-          <a
-            href="/auth"
-            style={{ fontSize: 13, color: T.textSec, textDecoration: "none" }}
-          >
-            Sign in →
-          </a>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 28, height: 28,
+            background: `${T.accent}30`,
+            border: `1.5px solid ${T.accent}`,
+            borderRadius: 5,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14,
+          }}>♛</div>
+          <span style={{ fontFamily: PIXEL, fontSize: 10, color: T.text, letterSpacing: "0.06em" }}>
+            KNIGHTCODE
+          </span>
+        </div>
+        <a
+          href="/auth"
+          style={{
+            fontFamily: PIXEL, fontSize: 8, color: T.accentBright,
+            textDecoration: "none",
+            background: `${T.accent}20`,
+            border: `1px solid ${T.accent}50`,
+            borderRadius: 5,
+            padding: "6px 14px",
+            letterSpacing: "0.06em",
+          }}
+        >
+          SIGN IN →
+        </a>
       </nav>
 
-      {/* Hero */}
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "80px 40px 64px" }}>
-        <p style={{
-          fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: 11,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: T.textMut,
-          marginBottom: 20,
-        }}>
-          Chess meets LeetCode
-        </p>
+      {/* ── Hero ── */}
+      <div style={{
+        maxWidth: 900,
+        margin: "0 auto",
+        padding: "100px 40px 80px",
+        textAlign: "center",
+        position: "relative",
+      }}>
+        {/* Glow orb behind */}
+        <div style={{
+          position: "absolute",
+          top: 60,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 600,
+          height: 400,
+          background: `radial-gradient(ellipse, ${T.accent}18 0%, transparent 70%)`,
+          pointerEvents: "none",
+          zIndex: 0,
+        }} />
 
-        <h1 style={{
-          fontSize: "clamp(40px, 6vw, 72px)",
-          fontWeight: 800,
-          letterSpacing: "-0.04em",
-          lineHeight: 1.0,
-          color: T.text,
-          marginBottom: 24,
-        }}>
-          Earn your move.<br />
-          <span style={{ color: T.textSec }}>Solve to play.</span>
-        </h1>
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <p style={{
+            fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
+            letterSpacing: "0.14em", marginBottom: 28,
+          }}>
+            CHESS × CODE
+          </p>
 
-        <p style={{
-          fontSize: 18,
-          color: T.textSec,
-          lineHeight: 1.6,
-          maxWidth: 540,
-          marginBottom: 48,
-        }}>
-          Two players. One chess board. To make any move, you must first solve a coding problem.
-          Faster solver earns the move. Fail in 3 minutes — turn skipped.
-        </p>
+          <h1 style={{
+            fontFamily: PIXEL,
+            fontSize: "clamp(22px, 4.5vw, 46px)",
+            color: T.text,
+            lineHeight: 1.35,
+            letterSpacing: "0.02em",
+            marginBottom: 28,
+          }}>
+            EARN YOUR MOVE.<br />
+            <span style={{ color: T.accentBright }}>SOLVE TO PLAY.</span>
+          </h1>
 
-        {/* CTA Box */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 420 }}>
-          {/* Play vs AI — primary CTA */}
-          <a
-            href="/game/ai"
-            style={{
-              display: "block",
-              padding: "14px 24px",
-              background: T.dark,
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              fontSize: 15,
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-              textDecoration: "none",
-              textAlign: "center",
-            }}
-          >
-            Play vs AI →
-          </a>
+          <p style={{
+            fontFamily: VT,
+            fontSize: 22,
+            color: T.textSec,
+            lineHeight: 1.6,
+            maxWidth: 520,
+            margin: "0 auto 52px",
+            letterSpacing: "0.02em",
+          }}>
+            Two players. One chess board. To make any move, you must first solve a coding problem.
+            Faster solver earns the move. Fail in time — turn skipped.
+          </p>
 
-          {/* Divider */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-            <span style={{ fontSize: 12, color: T.textMut }}>or play with a friend</span>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-          </div>
-
-          {isPro && (
-            <div>
-              <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-                Problem difficulty
-              </p>
-              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-                {(["easy", "medium", "hard"] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDifficulty(d)}
-                    style={{
-                      flex: 1, padding: "8px 0",
-                      background: difficulty === d ? T.dark : T.bgAlt,
-                      color: difficulty === d ? "#fff" : T.textSec,
-                      border: `1.5px solid ${difficulty === d ? T.dark : T.border}`,
-                      borderRadius: 8, fontSize: 12, fontWeight: 600,
-                      cursor: "pointer", fontFamily: "inherit",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isPro && (
-            <div>
-              <p style={{ fontSize: 11, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-                Time per turn
-              </p>
-              <div style={{ display: "flex", gap: 6 }}>
-                {([60, 180, 300] as const).map((secs) => (
-                  <button
-                    key={secs}
-                    onClick={() => setTimeLimit(secs)}
-                    style={{
-                      flex: 1, padding: "8px 0",
-                      background: timeLimit === secs ? T.dark : T.bgAlt,
-                      color: timeLimit === secs ? "#fff" : T.textSec,
-                      border: `1.5px solid ${timeLimit === secs ? T.dark : T.border}`,
-                      borderRadius: 8, fontSize: 13, fontWeight: 600,
-                      cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace",
-                    }}
-                  >
-                    {secs === 60 ? "1 min" : secs === 180 ? "3 min" : "5 min"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            style={{
-              padding: "12px 24px",
-              background: T.bgAlt,
-              color: T.text,
-              border: `1.5px solid ${T.border}`,
-              borderRadius: 10,
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: creating ? "wait" : "pointer",
-              opacity: creating ? 0.7 : 1,
-              letterSpacing: "-0.01em",
-              fontFamily: "inherit",
-            }}
-          >
-            {creating ? "Creating room…" : "Create Game"}
-          </button>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase().slice(0, 6))}
-              placeholder="ROOM CODE"
-              maxLength={6}
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <a
+              href="/auth"
               style={{
-                flex: 1,
-                padding: "12px 16px",
-                border: `1.5px solid ${T.border}`,
-                borderRadius: 10,
-                fontSize: 15,
-                fontFamily: "var(--font-geist-mono), monospace",
-                letterSpacing: "0.1em",
-                background: T.bg,
-                color: T.text,
-                outline: "none",
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-            />
-            <button
-              onClick={handleJoin}
-              disabled={joining}
-              style={{
-                padding: "12px 20px",
-                background: T.bgAlt,
-                color: T.text,
-                border: `1.5px solid ${T.border}`,
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: joining ? "wait" : "pointer",
-                opacity: joining ? 0.7 : 1,
-                fontFamily: "inherit",
-                whiteSpace: "nowrap",
+                fontFamily: PIXEL, fontSize: 10, color: "#fff",
+                textDecoration: "none",
+                background: T.accent,
+                border: `2px solid ${T.accent}`,
+                borderRadius: 7,
+                padding: "14px 32px",
+                letterSpacing: "0.06em",
+                boxShadow: `0 0 28px ${T.accent}60`,
               }}
             >
-              {joining ? "Joining…" : "Join Game"}
-            </button>
-          </div>
-
-          {/* Ranked matchmaking divider */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-            <span style={{ fontSize: 12, color: T.textMut }}>or play ranked</span>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-          </div>
-
-          {searching ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{
-                padding: "14px 20px",
-                background: T.bgAlt,
-                border: `1.5px solid ${T.border}`,
-                borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}>
-                <span style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>
-                  Searching… {Math.floor(searchElapsed / 60)}:{(searchElapsed % 60).toString().padStart(2, "0")}
-                </span>
-                <span style={{ fontSize: 12, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace" }}>
-                  {elo ?? 1200} ELO
-                </span>
-              </div>
-              <button
-                onClick={handleCancelSearch}
-                style={{
-                  padding: "10px 24px",
-                  background: "transparent",
-                  color: T.textSec,
-                  border: `1.5px solid ${T.border}`,
-                  borderRadius: 10,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleFindOpponent}
-              disabled={!user}
+              START PLAYING →
+            </a>
+            <a
+              href="#how-it-works"
               style={{
-                padding: "12px 24px",
-                background: T.bgAlt,
-                color: user ? T.text : T.textMut,
-                border: `1.5px solid ${T.border}`,
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: user ? "pointer" : "not-allowed",
-                letterSpacing: "-0.01em",
-                fontFamily: "inherit",
+                fontFamily: PIXEL, fontSize: 10, color: T.accentBright,
+                textDecoration: "none",
+                background: "transparent",
+                border: `2px solid ${T.accent}50`,
+                borderRadius: 7,
+                padding: "14px 28px",
+                letterSpacing: "0.06em",
               }}
             >
-              {user ? "Find Opponent (Ranked)" : "Sign in to play ranked"}
-            </button>
-          )}
-
-          {error && (
-            <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>{error}</p>
-          )}
+              HOW IT WORKS
+            </a>
+          </div>
         </div>
       </div>
 
-      {/* How it works */}
-      <div style={{ borderTop: `1px solid ${T.border}`, padding: "64px 40px", maxWidth: 860, margin: "0 auto" }}>
-        <p style={{
-          fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: 11,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: T.textMut,
-          marginBottom: 40,
-        }}>
-          How it works
-        </p>
+      {/* ── Pixel divider ── */}
+      <div style={{
+        height: 2,
+        background: `linear-gradient(90deg, transparent, ${T.border} 20%, ${T.border} 80%, transparent)`,
+        margin: "0 40px",
+      }} />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 32 }}>
-          {[
-            { n: "01", title: "Pick your move", body: "Select a chess piece and choose where to move it on the board." },
-            { n: "02", title: "Solve to unlock", body: "A coding problem appears. Solve it in 3 minutes to execute your move." },
-            { n: "03", title: "Earn the position", body: "Faster coding wins better positions. Checkmate wins the game." },
-          ].map((s) => (
-            <div key={s.n}>
-              <p style={{ fontFamily: "var(--font-geist-mono), monospace", fontSize: 11, color: T.textMut, letterSpacing: "0.08em", marginBottom: 12 }}>
+      {/* ── How it works ── */}
+      <div id="how-it-works" style={{ maxWidth: 900, margin: "0 auto", padding: "80px 40px" }}>
+        <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
+          letterSpacing: "0.14em", textAlign: "center", marginBottom: 10 }}>
+          THE RULES
+        </p>
+        <h2 style={{ fontFamily: PIXEL, fontSize: 18, color: T.text,
+          letterSpacing: "0.04em", textAlign: "center", marginBottom: 56 }}>
+          HOW IT WORKS
+        </h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+          {STEPS.map((s) => (
+            <div key={s.n} style={{
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: 10,
+              padding: "28px 24px",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* Big watermark number */}
+              <span style={{
+                position: "absolute", right: 16, bottom: 10,
+                fontFamily: MONO, fontSize: 64, fontWeight: 900,
+                color: T.border, lineHeight: 1,
+                userSelect: "none", pointerEvents: "none",
+              }}>
                 {s.n}
+              </span>
+
+              <p style={{ fontFamily: PIXEL, fontSize: 26, marginBottom: 16, lineHeight: 1 }}>
+                {s.icon}
               </p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 8, letterSpacing: "-0.01em" }}>
+              <p style={{ fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
+                letterSpacing: "0.06em", marginBottom: 12 }}>
                 {s.title}
               </p>
-              <p style={{ fontSize: 14, color: T.textSec, lineHeight: 1.55, margin: 0 }}>
+              <p style={{ fontFamily: VT, fontSize: 18, color: T.textSec, lineHeight: 1.5, margin: 0 }}>
                 {s.body}
               </p>
             </div>
@@ -557,43 +268,150 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Features grid */}
-      <div style={{ borderTop: `1px solid ${T.border}`, padding: "64px 40px 80px", maxWidth: 860, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
-          {[
-            { label: "Real chess rules", desc: "Full FIDE-compliant moves — castling, en passant, promotion." },
-            { label: "Coding problems", desc: "Easy to hard LeetCode-style problems. Currently supports JavaScript." },
-            { label: "3-minute timer", desc: "Fail to solve in time and your turn is automatically skipped." },
-            { label: "Persistent accounts", desc: "Sign up to track games and play with friends reliably." },
-          ].map((f) => (
-            <div key={f.label} style={{
-              padding: "20px",
-              border: `1px solid ${T.border}`,
+      {/* ── Pixel divider ── */}
+      <div style={{
+        height: 2,
+        background: `linear-gradient(90deg, transparent, ${T.border} 20%, ${T.border} 80%, transparent)`,
+        margin: "0 40px",
+      }} />
+
+      {/* ── Game modes ── */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "80px 40px" }}>
+        <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
+          letterSpacing: "0.14em", textAlign: "center", marginBottom: 10 }}>
+          PLAY MODES
+        </p>
+        <h2 style={{ fontFamily: PIXEL, fontSize: 18, color: T.text,
+          letterSpacing: "0.04em", textAlign: "center", marginBottom: 56 }}>
+          CHOOSE YOUR BATTLE
+        </h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+          {MODES.map((m) => (
+            <div key={m.title} style={{
+              background: T.surface,
+              border: `1.5px solid ${m.colorDim}`,
               borderRadius: 10,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: `0 0 28px ${m.color}10`,
             }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 4, letterSpacing: "-0.01em" }}>
-                {f.label}
-              </p>
-              <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.5, margin: 0 }}>
-                {f.desc}
-              </p>
+              {/* Image */}
+              <div style={{
+                height: 160,
+                backgroundImage: `url('${m.img}')`,
+                backgroundSize: "contain",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center bottom",
+                background: `${m.colorDim}`,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+                paddingBottom: 0,
+                position: "relative",
+              }}>
+                <img src={m.img} alt={m.title}
+                  style={{ height: 140, imageRendering: "pixelated", objectFit: "contain" }} />
+              </div>
+
+              {/* Content */}
+              <div style={{ padding: "20px 20px 20px", display: "flex", flexDirection: "column", flex: 1 }}>
+                <p style={{ fontFamily: PIXEL, fontSize: 7, color: m.color,
+                  letterSpacing: "0.1em", margin: "0 0 8px" }}>
+                  {m.sub}
+                </p>
+                <p style={{ fontFamily: PIXEL, fontSize: 11, color: T.text,
+                  letterSpacing: "0.04em", margin: "0 0 12px" }}>
+                  {m.title}
+                </p>
+                <p style={{ fontFamily: VT, fontSize: 18, color: T.textSec, lineHeight: 1.5,
+                  margin: "0 0 20px", flex: 1 }}>
+                  {m.desc}
+                </p>
+                <a
+                  href="/auth"
+                  style={{
+                    display: "block", padding: "10px 0", textAlign: "center",
+                    fontFamily: PIXEL, fontSize: 8, color: m.color,
+                    background: `${m.color}15`,
+                    border: `1.5px solid ${m.color}50`,
+                    borderRadius: 6,
+                    textDecoration: "none",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {m.cta}
+                </a>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Footer */}
+      {/* ── CTA Banner ── */}
+      <div style={{
+        maxWidth: 900, margin: "0 auto 80px",
+        padding: "0 40px",
+      }}>
+        <div style={{
+          background: `${T.accent}18`,
+          border: `1.5px solid ${T.accent}50`,
+          borderRadius: 12,
+          padding: "48px 40px",
+          textAlign: "center",
+          boxShadow: `0 0 48px ${T.accent}18`,
+        }}>
+          <p style={{ fontFamily: PIXEL, fontSize: 8, color: T.accentBright,
+            letterSpacing: "0.12em", marginBottom: 18 }}>
+            FREE TO PLAY
+          </p>
+          <h2 style={{ fontFamily: PIXEL, fontSize: 18, color: T.text,
+            letterSpacing: "0.04em", marginBottom: 14, lineHeight: 1.4 }}>
+            READY TO EARN<br />YOUR FIRST MOVE?
+          </h2>
+          <p style={{ fontFamily: VT, fontSize: 20, color: T.textSec, marginBottom: 36, lineHeight: 1.6 }}>
+            Create a free account and start your first game in under 60 seconds.
+          </p>
+          <a
+            href="/auth"
+            style={{
+              fontFamily: PIXEL, fontSize: 10, color: "#fff",
+              textDecoration: "none",
+              background: T.accent,
+              borderRadius: 7,
+              padding: "14px 36px",
+              letterSpacing: "0.06em",
+              boxShadow: `0 0 28px ${T.accent}60`,
+              display: "inline-block",
+            }}
+          >
+            CREATE ACCOUNT →
+          </a>
+        </div>
+      </div>
+
+      {/* ── Footer ── */}
       <div style={{
         borderTop: `1px solid ${T.border}`,
         padding: "28px 40px",
         display: "flex",
         justifyContent: "space-between",
-        maxWidth: 860,
+        alignItems: "center",
+        maxWidth: 900,
         margin: "0 auto",
       }}>
-        <span style={{ fontSize: 13, color: T.textMut }}>KnightCode — Chess × Code</span>
-        <span style={{ fontSize: 13, color: T.textMut }}>Built with Next.js + Supabase</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>♛</span>
+          <span style={{ fontFamily: PIXEL, fontSize: 8, color: T.textMut, letterSpacing: "0.06em" }}>
+            KNIGHTCODE
+          </span>
+        </div>
+        <span style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut, letterSpacing: "0.08em" }}>
+          CHESS × CODE
+        </span>
       </div>
+
     </div>
   );
 }
