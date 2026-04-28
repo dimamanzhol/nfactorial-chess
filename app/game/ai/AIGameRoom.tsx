@@ -308,7 +308,7 @@ export default function AIGameRoom() {
     if (phase !== "player_turn" || activeProblem) return;
     const piece = chess.get(square as Square);
     if (selectedSquare) {
-      if (getLegalSquares(selectedSquare).includes(square)) {
+      if (getLegalSquares(selectedSquare).includes(square as Square)) {
         const tc = new Chess(chess.fen());
         const result = tc.move({ from: selectedSquare as Square, to: square as Square, promotion: "q" });
         if (!result) return;
