@@ -665,7 +665,7 @@ export default function GameRoom({ gameId, isPro = false, isRanked = false }: { 
     const piece = chess.get(square as Square);
     const myChessColor = myColor === "white" ? "w" : "b";
     if (selectedSquare) {
-      if (getLegalSquares(selectedSquare).includes(square)) { clearSelection(); openProblem(selectedSquare, square); return; }
+      if (getLegalSquares(selectedSquare).includes(square as Square)) { clearSelection(); openProblem(selectedSquare, square); return; }
       if (piece?.color === myChessColor) { setSelection(square); return; }
       clearSelection(); return;
     }
