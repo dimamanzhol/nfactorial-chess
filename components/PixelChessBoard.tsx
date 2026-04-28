@@ -12,18 +12,16 @@ const PIECE_CODES = [
 const customPieces = Object.fromEntries(
   PIECE_CODES.map((code) => [
     code,
-    ({ squareWidth }: { squareWidth: number }) => (
+    () => (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={`/pieces/${code.toLowerCase()}.png`}
         alt={code}
-        width={squareWidth}
-        height={squareWidth}
         style={{
           imageRendering: "pixelated",
           display: "block",
-          width: squareWidth,
-          height: squareWidth,
+          width: "100%",
+          height: "100%",
           objectFit: "contain",
         }}
       />
@@ -130,7 +128,7 @@ export default function PixelChessBoard({
             } as React.CSSProperties,
             lightSquareStyle: { backgroundColor: "#3B2352" },
             darkSquareStyle:  { backgroundColor: "#2A163A" },
-            customPieces,
+            pieces: customPieces,
             allowDragging,
           }}
         />
