@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const T = {
   bg:           "#0d0a1a",
@@ -75,6 +76,7 @@ const MODES = [
 
 export default function LandingPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -131,7 +133,7 @@ export default function LandingPage() {
       <div style={{
         maxWidth: 900,
         margin: "0 auto",
-        padding: "100px 40px 80px",
+        padding: isMobile ? "60px 20px 40px" : "100px 40px 80px",
         textAlign: "center",
         position: "relative",
       }}>
@@ -181,6 +183,25 @@ export default function LandingPage() {
             Faster solver earns the move. Fail in time — turn skipped.
           </p>
 
+          {/* Hero video */}
+          <div style={{
+            margin: "0 auto 48px",
+            maxWidth: 720,
+            borderRadius: 10,
+            overflow: "hidden",
+            border: `1.5px solid ${T.border}`,
+            boxShadow: `0 0 40px ${T.accent}20`,
+          }}>
+            <video
+              src="/knightcode-herodemo.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{ width: "100%", display: "block" }}
+            />
+          </div>
+
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <a
               href="/auth"
@@ -197,20 +218,6 @@ export default function LandingPage() {
             >
               START PLAYING →
             </a>
-            <a
-              href="#how-it-works"
-              style={{
-                fontFamily: PIXEL, fontSize: 10, color: T.accentBright,
-                textDecoration: "none",
-                background: "transparent",
-                border: `2px solid ${T.accent}50`,
-                borderRadius: 7,
-                padding: "14px 28px",
-                letterSpacing: "0.06em",
-              }}
-            >
-              HOW IT WORKS
-            </a>
           </div>
         </div>
       </div>
@@ -223,7 +230,7 @@ export default function LandingPage() {
       }} />
 
       {/* ── How it works ── */}
-      <div id="how-it-works" style={{ maxWidth: 900, margin: "0 auto", padding: "80px 40px" }}>
+      <div id="how-it-works" style={{ maxWidth: 900, margin: "0 auto", padding: isMobile ? "48px 20px" : "80px 40px" }}>
         <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
           letterSpacing: "0.14em", textAlign: "center", marginBottom: 10 }}>
           THE RULES
@@ -249,18 +256,19 @@ export default function LandingPage() {
                 fontFamily: MONO, fontSize: 64, fontWeight: 900,
                 color: T.border, lineHeight: 1,
                 userSelect: "none", pointerEvents: "none",
+                zIndex: 0,
               }}>
                 {s.n}
               </span>
 
-              <p style={{ fontFamily: PIXEL, fontSize: 26, marginBottom: 16, lineHeight: 1 }}>
+              <p style={{ fontFamily: PIXEL, fontSize: 26, marginBottom: 16, lineHeight: 1, position: "relative", zIndex: 1 }}>
                 {s.icon}
               </p>
               <p style={{ fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
-                letterSpacing: "0.06em", marginBottom: 12 }}>
+                letterSpacing: "0.06em", marginBottom: 12, position: "relative", zIndex: 1 }}>
                 {s.title}
               </p>
-              <p style={{ fontFamily: VT, fontSize: 18, color: T.textSec, lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontFamily: VT, fontSize: 18, color: T.textSec, lineHeight: 1.5, margin: 0, position: "relative", zIndex: 1 }}>
                 {s.body}
               </p>
             </div>
@@ -276,7 +284,7 @@ export default function LandingPage() {
       }} />
 
       {/* ── Game modes ── */}
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "80px 40px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: isMobile ? "48px 20px" : "80px 40px" }}>
         <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
           letterSpacing: "0.14em", textAlign: "center", marginBottom: 10 }}>
           PLAY MODES

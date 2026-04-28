@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/subscription";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
@@ -90,6 +91,7 @@ export default function ProfilePage() {
   const [elo, setElo]     = useState(1200);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -128,7 +130,7 @@ export default function ProfilePage() {
   );
 
   return (
-    <div style={{ padding: "40px 44px", background: T.bg, minHeight: "100vh", maxWidth: 860 }}>
+    <div style={{ padding: isMobile ? "24px 16px" : "40px 44px", background: T.bg, minHeight: "100vh", maxWidth: 860 }}>
 
       {/* ── Hero card ── */}
       <div style={{
@@ -137,7 +139,8 @@ export default function ProfilePage() {
         borderRadius: 8,
         padding: "28px",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-start" : "center",
+        flexDirection: isMobile ? "column" : "row",
         gap: 24,
         marginBottom: 16,
         position: "relative",
@@ -223,7 +226,7 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
         {statCards.map(({ label, value }) => (
           <div key={label} style={{
             background: T.surface, border: `1px solid ${T.border}`,

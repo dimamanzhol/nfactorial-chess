@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase, signOut } from "@/lib/supabase";
 import { getProfile } from "@/lib/subscription";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
@@ -42,9 +43,9 @@ function getTier(elo: number) {
 }
 
 const NAV = [
-  { label: "DASHBOARD",   href: "/dashboard/play",        icon: "⌂" },
-  { label: "LEADERBOARD", href: "/dashboard/leaderboard", icon: "🏆" },
-  { label: "PROFILE",     href: "/dashboard/profile",     icon: "👤" },
+  { label: "DASHBOARD",   short: "PLAY",   href: "/dashboard/play",        icon: "⌂" },
+  { label: "LEADERBOARD", short: "RANKS",  href: "/dashboard/leaderboard", icon: "♛" },
+  { label: "PROFILE",     short: "ME",     href: "/dashboard/profile",     icon: "♟" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -75,20 +76,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ?? user?.email?.split("@")[0]
     ?? "PLAYER";
 
-  const tier = getTier(elo);
-  const pfp  = PFP_MAP[tier.name];
+  const tier    = getTier(elo);
+  const pfp     = PFP_MAP[tier.name];
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.bg,
-      fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
+      fontFamily: "var(--font-geist), system-ui, sans-serif",
+      flexDirection: isMobile ? "column" : "row" }}>
 
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar (desktop) ── */}
       <aside style={{
         width: 240,
         minHeight: "100vh",
         background: T.surface,
         borderRight: `1px solid ${T.border}`,
-        display: "flex",
+        display: isMobile ? "none" : "flex",
         flexDirection: "column",
         flexShrink: 0,
         position: "sticky",
@@ -238,10 +241,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
+      {/* ── Mobile top bar ── */}
+      {isMobile && (
+        <header style={{
+          height: 52, background: T.surface,
+          borderBottom: `1px solid ${T.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 16px", flexShrink: 0, position: "sticky", top: 0, zIndex: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 28, height: 28, background: `${T.accent}30`,
+              border: `1.5px solid ${T.accent}`, borderRadius: 5,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>♛</div>
+            <span style={{ fontFamily: PIXEL, fontSize: 9, color: T.text, letterSpacing: "0.06em" }}>
+              KNIGHTCODE
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 12, color: T.gold, fontWeight: 700 }}>
+              🏆 {elo}
+            </span>
+            {!isPro && (
+              <a href="/pricing" style={{
+                fontFamily: PIXEL, fontSize: 7, color: T.accentBright,
+                background: `${T.accent}20`, border: `1px solid ${T.accent}50`,
+                borderRadius: 4, padding: "3px 8px", textDecoration: "none",
+                letterSpacing: "0.04em",
+              }}>⚡ PRO</a>
+            )}
+          </div>
+        </header>
+      )}
+
       {/* Main content */}
-      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: T.bg }}>
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column",
+        background: T.bg, paddingBottom: isMobile ? 64 : 0 }}>
         {children}
       </main>
+
+      {/* ── Mobile bottom nav ── */}
+      {isMobile && (
+        <nav style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          height: 60, background: T.surface,
+          borderTop: `1px solid ${T.border}`,
+          display: "flex", alignItems: "stretch",
+          zIndex: 20,
+        }}>
+          {NAV.map(({ short, href, icon }) => {
+            const active = pathname === href || pathname.startsWith(href);
+            return (
+              <a key={href} href={href} style={{
+                flex: 1, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 3,
+                textDecoration: "none",
+                color: active ? T.accentBright : T.textMut,
+                background: active ? `${T.accent}12` : "transparent",
+                borderTop: active ? `2px solid ${T.accent}` : "2px solid transparent",
+              }}>
+                <span style={{ fontSize: 20 }}>{icon}</span>
+                <span style={{ fontFamily: PIXEL, fontSize: 6, letterSpacing: "0.02em" }}>{short}</span>
+              </a>
+            );
+          })}
+          <button onClick={async () => { await signOut(); router.replace("/"); }} style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 3,
+            background: "none", border: "none", cursor: "pointer",
+            color: T.textMut, borderTop: "2px solid transparent",
+          }}>
+            <span style={{ fontSize: 20 }}>⇥</span>
+            <span style={{ fontFamily: PIXEL, fontSize: 6, letterSpacing: "0.02em" }}>OUT</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

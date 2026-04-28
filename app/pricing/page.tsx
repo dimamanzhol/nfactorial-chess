@@ -4,33 +4,37 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/subscription";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
-  bg: "#f7f3ee",
-  bgAlt: "#efebe4",
-  surface: "#ffffff",
-  text: "#0f0f0d",
-  textSec: "#6e6e62",
-  textMut: "#9e9e92",
-  border: "#e5e1d8",
-  green: "#16a34a",
+  bg:           "#0d0a1a",
+  surface:      "#13102a",
+  border:       "#2d2250",
+  accent:       "#7c3aed",
+  accentBright: "#a78bfa",
+  text:         "#e8e0f5",
+  textSec:      "#a89cc8",
+  textMut:      "#5e4f8a",
+  green:        "#22c55e",
+  gold:         "#f59e0b",
 };
 
+const PIXEL = "var(--font-pixel), monospace";
 const PRODUCT_ID = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID ?? "";
 
 function PricingContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success") === "true";
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser]   = useState<User | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user);
       if (data.user) {
-        // If coming back from a successful checkout, verify and activate Pro
         const checkoutId = searchParams.get("checkoutId");
         if (success && checkoutId) {
           await fetch(`/api/polar/verify-checkout?checkoutId=${checkoutId}`);
@@ -46,154 +50,175 @@ function PricingContent() {
   const upgradeUrl = user
     ? `/api/polar/checkout?products=${PRODUCT_ID}&customerEmail=${encodeURIComponent(user.email ?? "")}&customerExternalId=${user.id}`
     : "/auth";
-
   const portalUrl = user ? `/api/polar/portal?userId=${user.id}` : "/auth";
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "var(--font-geist), system-ui, sans-serif", color: T.text }}>
+    <div style={{ background: T.bg, minHeight: "100vh",
+      fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
+
       {/* Nav */}
       <nav style={{
-        height: 52, borderBottom: `1px solid ${T.border}`,
+        height: 56, borderBottom: `1px solid ${T.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", background: T.bg,
+        padding: "0 40px",
       }}>
-        <a href="/" style={{ fontWeight: 800, fontSize: 14, letterSpacing: "-0.03em", color: T.text, textDecoration: "none" }}>
-          KnightCode
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+          <div style={{
+            width: 28, height: 28,
+            background: `${T.accent}30`, border: `1.5px solid ${T.accent}`,
+            borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+          }}>♛</div>
+          <span style={{ fontFamily: PIXEL, fontSize: 10, color: T.text, letterSpacing: "0.06em" }}>
+            KNIGHTCODE
+          </span>
         </a>
-        <a href="/" style={{ fontSize: 13, color: T.textMut, textDecoration: "none" }}>← Back</a>
+        <a href="/" style={{ fontFamily: PIXEL, fontSize: 8, color: T.textMut,
+          textDecoration: "none", letterSpacing: "0.06em" }}>
+          ← BACK
+        </a>
       </nav>
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: isMobile ? "32px 16px" : "60px 24px" }}>
+
         {/* Success banner */}
         {success && (
           <div style={{
             marginBottom: 32, padding: "14px 20px",
-            background: `${T.green}10`, border: `1px solid ${T.green}30`,
-            borderRadius: 10, fontSize: 14, color: T.green, fontWeight: 600,
+            background: `${T.green}15`, border: `1px solid ${T.green}40`,
+            borderRadius: 8,
           }}>
-            You&apos;re now Pro! Enjoy unlimited games and all difficulties.
+            <p style={{ fontFamily: PIXEL, fontSize: 8, color: T.green,
+              letterSpacing: "0.06em", margin: 0 }}>
+              ⚡ YOU&apos;RE NOW PRO! ENJOY UNLIMITED GAMES AND ALL DIFFICULTIES.
+            </p>
           </div>
         )}
 
-        <p style={{
-          fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase",
-          color: T.textMut, marginBottom: 16,
-        }}>
-          Pricing
-        </p>
-        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 8 }}>
-          Simple, honest pricing
+        {/* Header */}
+        <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
+          letterSpacing: "0.14em", marginBottom: 12 }}>PRICING</p>
+        <h1 style={{ fontFamily: PIXEL, fontSize: 20, color: T.text,
+          letterSpacing: "0.04em", marginBottom: 12, lineHeight: 1.4 }}>
+          SIMPLE, HONEST<br />PRICING
         </h1>
-        <p style={{ fontSize: 15, color: T.textSec, marginBottom: 40 }}>
+        <p style={{ fontFamily: "var(--font-vt), monospace", fontSize: 20,
+          color: T.textSec, marginBottom: 48 }}>
           Free to play. Upgrade for unlimited access.
         </p>
 
         {/* Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {/* Free card */}
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+
+          {/* Free */}
           <div style={{
-            background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 16, padding: "28px 24px",
+            background: T.surface,
+            border: `1px solid ${T.border}`,
+            borderRadius: 12, padding: "28px 24px",
+            display: "flex", flexDirection: "column",
           }}>
-            <p style={{ fontSize: 11, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: T.textMut, marginBottom: 12 }}>
-              Free
-            </p>
-            <p style={{ fontSize: 36, fontWeight: 800, letterSpacing: "-0.04em", marginBottom: 4 }}>$0</p>
-            <p style={{ fontSize: 13, color: T.textSec, marginBottom: 24 }}>Forever free</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-              {[
-                "5 games per day",
-                "Easy problems only",
-                "No game history",
-              ].map((f) => (
-                <div key={f} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 13, color: T.textMut }}>—</span>
-                  <span style={{ fontSize: 13, color: T.textSec }}>{f}</span>
+            <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
+              letterSpacing: "0.12em", marginBottom: 16 }}>FREE</p>
+            <p style={{ fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 40, fontWeight: 800, color: T.text,
+              letterSpacing: "-0.04em", margin: "0 0 4px" }}>$0</p>
+            <p style={{ fontFamily: "var(--font-vt), monospace", fontSize: 18,
+              color: T.textMut, marginBottom: 24 }}>Forever free</p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28, flex: 1 }}>
+              {["5 games per day", "Easy problems only", "Python only"].map((f) => (
+                <div key={f} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ color: T.textMut, fontSize: 14 }}>—</span>
+                  <span style={{ fontFamily: "var(--font-vt), monospace",
+                    fontSize: 18, color: T.textSec }}>{f}</span>
                 </div>
               ))}
             </div>
+
             <div style={{
               padding: "10px 0", textAlign: "center",
-              fontSize: 13, color: T.textMut, fontWeight: 500,
-              border: `1px solid ${T.border}`, borderRadius: 8,
+              border: `1px solid ${T.border}`, borderRadius: 7,
+              fontFamily: PIXEL, fontSize: 8, color: T.textMut, letterSpacing: "0.06em",
             }}>
-              Current plan
+              CURRENT PLAN
             </div>
           </div>
 
-          {/* Pro card */}
+          {/* Pro */}
           <div style={{
-            background: T.surface, border: `1.5px solid ${T.text}`,
-            borderRadius: 16, padding: "28px 24px", position: "relative",
+            background: `${T.accent}12`,
+            border: `1.5px solid ${T.accent}60`,
+            borderRadius: 12, padding: "28px 24px",
+            position: "relative",
+            display: "flex", flexDirection: "column",
+            boxShadow: `0 0 32px ${T.accent}18`,
           }}>
+            {/* Badge */}
             <div style={{
               position: "absolute", top: -1, right: 20,
-              background: T.text, color: "#fff",
-              fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-              padding: "4px 10px", borderRadius: "0 0 8px 8px",
-              textTransform: "uppercase",
+              background: T.accent, color: "#fff",
+              fontFamily: PIXEL, fontSize: 7,
+              letterSpacing: "0.08em",
+              padding: "4px 10px", borderRadius: "0 0 7px 7px",
             }}>
-              Recommended
+              RECOMMENDED
             </div>
-            <p style={{ fontSize: 11, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: T.textMut, marginBottom: 12 }}>
-              Pro
-            </p>
-            <p style={{ fontSize: 36, fontWeight: 800, letterSpacing: "-0.04em", marginBottom: 4 }}>$7</p>
-            <p style={{ fontSize: 13, color: T.textSec, marginBottom: 24 }}>per month</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
+
+            <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.accentBright,
+              letterSpacing: "0.12em", marginBottom: 16 }}>PRO</p>
+            <p style={{ fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 40, fontWeight: 800, color: T.gold,
+              letterSpacing: "-0.04em", margin: "0 0 4px" }}>$7</p>
+            <p style={{ fontFamily: "var(--font-vt), monospace", fontSize: 18,
+              color: T.textSec, marginBottom: 24 }}>per month</p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28, flex: 1 }}>
               {[
                 "Unlimited games",
                 "Easy + Medium + Hard problems",
-                "Full game history & replay",
+                "JavaScript + Python",
+                "All time controls (1 / 3 / 5 min)",
               ].map((f) => (
-                <div key={f} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 13, color: T.green, fontWeight: 700 }}>✓</span>
-                  <span style={{ fontSize: 13, color: T.text }}>{f}</span>
+                <div key={f} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ color: T.green, fontSize: 14, fontWeight: 700 }}>✓</span>
+                  <span style={{ fontFamily: "var(--font-vt), monospace",
+                    fontSize: 18, color: T.text }}>{f}</span>
                 </div>
               ))}
             </div>
+
             {loading ? (
               <div style={{ height: 40 }} />
             ) : !user ? (
-              <a
-                href="/auth"
-                style={{
-                  display: "block", padding: "10px 0", textAlign: "center",
-                  background: T.text, color: "#fff",
-                  borderRadius: 8, textDecoration: "none",
-                  fontSize: 13, fontWeight: 600,
-                }}
-              >
-                Sign in to upgrade
+              <a href="/auth" style={{
+                display: "block", padding: "12px 0", textAlign: "center",
+                background: T.accent, color: "#fff", borderRadius: 7,
+                textDecoration: "none", fontFamily: PIXEL, fontSize: 9,
+                letterSpacing: "0.06em", boxShadow: `0 0 20px ${T.accent}50`,
+              }}>
+                SIGN IN TO UPGRADE →
               </a>
             ) : isPro ? (
-              <a
-                href={portalUrl}
-                style={{
-                  display: "block", padding: "10px 0", textAlign: "center",
-                  background: T.bgAlt, color: T.text,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 8, textDecoration: "none",
-                  fontSize: 13, fontWeight: 600,
-                }}
-              >
-                Manage subscription →
+              <a href={portalUrl} style={{
+                display: "block", padding: "12px 0", textAlign: "center",
+                background: `${T.accent}20`, color: T.accentBright,
+                border: `1px solid ${T.accent}50`,
+                borderRadius: 7, textDecoration: "none",
+                fontFamily: PIXEL, fontSize: 9, letterSpacing: "0.06em",
+              }}>
+                MANAGE SUBSCRIPTION →
               </a>
             ) : (
-              <a
-                href={upgradeUrl}
-                style={{
-                  display: "block", padding: "10px 0", textAlign: "center",
-                  background: T.text, color: "#fff",
-                  borderRadius: 8, textDecoration: "none",
-                  fontSize: 13, fontWeight: 600,
-                }}
-              >
-                Upgrade →
+              <a href={upgradeUrl} style={{
+                display: "block", padding: "12px 0", textAlign: "center",
+                background: T.accent, color: "#fff", borderRadius: 7,
+                textDecoration: "none", fontFamily: PIXEL, fontSize: 9,
+                letterSpacing: "0.06em", boxShadow: `0 0 20px ${T.accent}50`,
+              }}>
+                UPGRADE →
               </a>
             )}
           </div>
+
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { getPlayerId, supabase } from "@/lib/supabase";
 import { createGame, joinGame } from "@/lib/game";
 import { getProfile } from "@/lib/subscription";
 import { joinQueue, cancelQueue } from "@/lib/matchmaking";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const T = {
   bg:           "#0d0a1a",
@@ -31,6 +32,7 @@ const MONO  = "var(--font-geist-mono), monospace";
 
 export default function PlayPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [displayName, setDisplayName] = useState("PLAYER");
   const [isPro, setIsPro]       = useState(false);
   const [elo, setElo]           = useState(1200);
@@ -156,7 +158,7 @@ export default function PlayPage() {
   }
 
   return (
-    <div style={{ padding: "40px 44px", background: T.bg, minHeight: "100vh" }}>
+    <div style={{ padding: isMobile ? "24px 16px" : "40px 44px", background: T.bg, minHeight: "100vh" }}>
 
       {/* ── Welcome header ── */}
       <div style={{ marginBottom: 28 }}>
@@ -176,7 +178,7 @@ export default function PlayPage() {
       </div>
 
       {/* ── 3 game mode cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
 
         {/* ── VS AI ── */}
         <div style={{
@@ -445,63 +447,67 @@ export default function PlayPage() {
         background: T.surface,
         border: `1px solid ${T.border}`,
         borderRadius: 8,
-        padding: "18px 24px",
-        display: "flex", alignItems: "center", gap: 20,
+        padding: "18px 20px",
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        alignItems: isMobile ? "flex-start" : "center",
+        gap: isMobile ? 12 : 20,
       }}>
-        {/* quest icon */}
-        <div style={{
-          width: 44, height: 44, flexShrink: 0,
-          backgroundImage: "url('/pawn.png')",
-          backgroundSize: "contain", backgroundRepeat: "no-repeat",
-          backgroundPosition: "center",
-          imageRendering: "pixelated",
-          opacity: 0.85,
-        }} />
-
-        {/* quest info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
-            letterSpacing: "0.1em", margin: "0 0 5px" }}>
-            DAILY QUEST
-          </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <p style={{ fontSize: 13, color: T.text, margin: 0, fontWeight: 500 }}>
-              Win 2 games today
-            </p>
-            <span style={{ fontSize: 12, color: T.accentBright, fontFamily: MONO, fontWeight: 700 }}>
-              1 / 2
-            </span>
-          </div>
-          {/* progress bar */}
+        {/* top row: icon + title + progress */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", flex: 1, minWidth: 0 }}>
           <div style={{
-            marginTop: 8, height: 4, borderRadius: 2,
-            background: T.border, overflow: "hidden",
-          }}>
-            <div style={{
-              width: "50%", height: "100%",
-              background: `linear-gradient(90deg, ${T.accent}, ${T.accentBright})`,
-              borderRadius: 2,
-            }} />
+            width: 44, height: 44, flexShrink: 0,
+            backgroundImage: "url('/pawn.png')",
+            backgroundSize: "contain", backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+            imageRendering: "pixelated",
+            opacity: 0.85,
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
+              letterSpacing: "0.1em", margin: "0 0 5px" }}>
+              DAILY QUEST
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <p style={{ fontSize: 13, color: T.text, margin: 0, fontWeight: 500 }}>
+                Win 2 games today
+              </p>
+              <span style={{ fontSize: 12, color: T.accentBright, fontFamily: MONO, fontWeight: 700 }}>
+                1 / 2
+              </span>
+            </div>
+            <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: T.border, overflow: "hidden" }}>
+              <div style={{
+                width: "50%", height: "100%",
+                background: `linear-gradient(90deg, ${T.accent}, ${T.accentBright})`,
+                borderRadius: 2,
+              }} />
+            </div>
           </div>
         </div>
 
-        {/* reward */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+        {/* reward + button row */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          gap: 12, flexShrink: 0,
+          width: isMobile ? "100%" : "auto",
+          justifyContent: isMobile ? "space-between" : "flex-end",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 12, color: T.textMut, fontFamily: MONO, letterSpacing: "0.08em" }}>REWARD:</span>
+            <span style={{ fontSize: 11, color: T.textMut, fontFamily: MONO, letterSpacing: "0.06em" }}>REWARD:</span>
             <span style={{ fontSize: 13, color: T.accentBright, fontWeight: 700, fontFamily: MONO }}>💎 150</span>
             <span style={{ fontSize: 13, color: T.goldBright, fontWeight: 700, fontFamily: MONO }}>⚡ 300 XP</span>
           </div>
           <button style={{
-            padding: "10px 16px",
-            background: T.surfaceAlt ?? T.surface,
+            padding: "9px 14px",
+            background: T.surface,
             border: `1px solid ${T.border}`,
             borderRadius: 4, color: T.text,
-            fontFamily: PIXEL, fontSize: 9,
+            fontFamily: PIXEL, fontSize: 8,
             letterSpacing: "0.06em", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 8,
+            whiteSpace: "nowrap",
           }}>
-            VIEW QUESTS <span style={{ fontSize: 14 }}>›</span>
+            VIEW QUESTS ›
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const T = {
   bg:           "#0d0a1a",
@@ -62,6 +63,7 @@ export default function LeaderboardPage() {
   const [rows, setRows]     = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [myId, setMyId]     = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
@@ -75,7 +77,7 @@ export default function LeaderboardPage() {
   const rest   = rows.slice(3);
 
   return (
-    <div style={{ padding: "40px 44px", background: T.bg, minHeight: "100vh" }}>
+    <div style={{ padding: isMobile ? "24px 16px" : "40px 44px", background: T.bg, minHeight: "100vh" }}>
 
       {/* ── Header ── */}
       <div style={{ marginBottom: 32 }}>
@@ -97,7 +99,7 @@ export default function LeaderboardPage() {
         <>
           {/* ── Top 3 podium cards ── */}
           {top3.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
               {top3.map((row, i) => {
                 const tier  = getTier(row.elo);
                 const name  = row.full_name ?? row.email.split("@")[0];

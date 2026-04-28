@@ -5,175 +5,179 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const T = {
-  bg: "#f7f3ee",
-  bgAlt: "#efebe4",
-  text: "#0f0f0d",
-  textSec: "#6e6e62",
-  textMut: "#9e9e92",
-  border: "#e5e1d8",
-  dark: "#0f0f0d",
-  error: "#ef4444",
+  bg:           "#0d0a1a",
+  surface:      "#13102a",
+  border:       "#2d2250",
+  accent:       "#7c3aed",
+  accentBright: "#a78bfa",
+  text:         "#e8e0f5",
+  textSec:      "#a89cc8",
+  textMut:      "#5e4f8a",
+  error:        "#ef4444",
+  green:        "#22c55e",
 };
+
+const PIXEL = "var(--font-pixel), monospace";
 
 export default function AuthPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [tab, setTab]           = useState<"signin" | "signup">("signin");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [info, setInfo]         = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setInfo("");
-    setLoading(true);
-
+    setError(""); setInfo(""); setLoading(true);
     if (tab === "signin") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-      } else {
-        router.push("/");
-      }
+      if (error) { setError(error.message); setLoading(false); }
+      else router.push("/dashboard/play");
     } else {
       const { error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-      } else {
-        setInfo("Check your email for a confirmation link, then sign in.");
-        setLoading(false);
-        setTab("signin");
-      }
+      if (error) { setError(error.message); setLoading(false); }
+      else { setInfo("Check your email for a confirmation link, then sign in."); setLoading(false); setTab("signin"); }
     }
   }
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
+    <div style={{ background: T.bg, minHeight: "100vh", display: "flex", flexDirection: "column",
+      fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
+
       {/* Nav */}
       <nav style={{
         borderBottom: `1px solid ${T.border}`,
-        padding: "0 40px",
-        height: 56,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        position: "sticky",
-        top: 0,
-        background: T.bg,
-        zIndex: 10,
+        padding: "0 40px", height: 56,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexShrink: 0,
       }}>
-        <a href="/" style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em", color: T.text, textDecoration: "none" }}>
-          KnightCode
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+          <div style={{
+            width: 28, height: 28,
+            background: `${T.accent}30`, border: `1.5px solid ${T.accent}`,
+            borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+          }}>♛</div>
+          <span style={{ fontFamily: PIXEL, fontSize: 10, color: T.text, letterSpacing: "0.06em" }}>
+            KNIGHTCODE
+          </span>
+        </a>
+        <a href="/" style={{ fontFamily: PIXEL, fontSize: 8, color: T.textMut,
+          textDecoration: "none", letterSpacing: "0.06em" }}>
+          ← BACK
         </a>
       </nav>
 
-      {/* Form */}
-      <div style={{ maxWidth: 400, margin: "80px auto", padding: "0 24px" }}>
-        <p style={{
-          fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: 11,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: T.textMut,
-          marginBottom: 20,
+      {/* Centered card */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
+        <div style={{
+          width: "100%", maxWidth: 400,
+          background: T.surface,
+          border: `1.5px solid ${T.border}`,
+          borderRadius: 12,
+          padding: "36px 32px",
+          boxShadow: `0 0 40px ${T.accent}12`,
         }}>
-          Account
-        </p>
+          {/* Header */}
+          <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.textMut,
+            letterSpacing: "0.14em", marginBottom: 12 }}>ACCOUNT</p>
+          <p style={{ fontFamily: PIXEL, fontSize: 14, color: T.text,
+            letterSpacing: "0.04em", marginBottom: 28, lineHeight: 1.4 }}>
+            {tab === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}
+          </p>
 
-        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: T.text, marginBottom: 32 }}>
-          {tab === "signin" ? "Sign in" : "Create account"}
-        </h1>
+          {/* Tab toggle */}
+          <div style={{
+            display: "flex", marginBottom: 24,
+            border: `1px solid ${T.border}`, borderRadius: 7, overflow: "hidden",
+          }}>
+            {(["signin", "signup"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setError(""); setInfo(""); }}
+                style={{
+                  flex: 1, padding: "9px 0",
+                  background: tab === t ? T.accent : "transparent",
+                  color: tab === t ? "#fff" : T.textMut,
+                  border: "none", cursor: "pointer",
+                  fontFamily: PIXEL, fontSize: 8,
+                  letterSpacing: "0.06em",
+                  transition: "background 0.12s",
+                }}
+              >
+                {t === "signin" ? "SIGN IN" : "SIGN UP"}
+              </button>
+            ))}
+          </div>
 
-        {/* Tab toggle */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 28, border: `1.5px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-          {(["signin", "signup"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => { setTab(t); setError(""); setInfo(""); }}
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
               style={{
-                flex: 1,
-                padding: "10px 0",
-                background: tab === t ? T.dark : "transparent",
-                color: tab === t ? "#fff" : T.textSec,
-                border: "none",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                letterSpacing: "-0.01em",
+                padding: "12px 14px",
+                background: T.bg,
+                border: `1px solid ${T.border}`,
+                borderRadius: 7,
+                fontSize: 14, color: T.text,
+                outline: "none", fontFamily: "inherit",
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required minLength={6}
+              style={{
+                padding: "12px 14px",
+                background: T.bg,
+                border: `1px solid ${T.border}`,
+                borderRadius: 7,
+                fontSize: 14, color: T.text,
+                outline: "none", fontFamily: "inherit",
+              }}
+            />
+
+            {error && (
+              <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.error,
+                margin: 0, letterSpacing: "0.04em", lineHeight: 1.6 }}>
+                {error}
+              </p>
+            )}
+            {info && (
+              <p style={{ fontFamily: PIXEL, fontSize: 7, color: T.green,
+                margin: 0, letterSpacing: "0.04em", lineHeight: 1.6 }}>
+                {info}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                marginTop: 6,
+                padding: "13px 0",
+                background: loading ? `${T.accent}80` : T.accent,
+                color: "#fff", border: "none", borderRadius: 7,
+                fontFamily: PIXEL, fontSize: 9,
+                letterSpacing: "0.06em",
+                cursor: loading ? "wait" : "pointer",
+                boxShadow: loading ? "none" : `0 0 20px ${T.accent}50`,
+                transition: "box-shadow 0.12s",
               }}
             >
-              {t === "signin" ? "Sign in" : "Sign up"}
+              {loading ? "…" : tab === "signin" ? "SIGN IN →" : "CREATE ACCOUNT →"}
             </button>
-          ))}
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{
-              padding: "12px 16px",
-              border: `1.5px solid ${T.border}`,
-              borderRadius: 10,
-              fontSize: 15,
-              background: T.bg,
-              color: T.text,
-              outline: "none",
-              fontFamily: "inherit",
-            }}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            style={{
-              padding: "12px 16px",
-              border: `1.5px solid ${T.border}`,
-              borderRadius: 10,
-              fontSize: 15,
-              background: T.bg,
-              color: T.text,
-              outline: "none",
-              fontFamily: "inherit",
-            }}
-          />
-
-          {error && <p style={{ fontSize: 13, color: T.error, margin: 0 }}>{error}</p>}
-          {info && <p style={{ fontSize: 13, color: T.textSec, margin: 0 }}>{info}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: 4,
-              padding: "13px 24px",
-              background: T.dark,
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: loading ? "wait" : "pointer",
-              opacity: loading ? 0.7 : 1,
-              fontFamily: "inherit",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {loading ? "…" : tab === "signin" ? "Sign in →" : "Create account →"}
-          </button>
-        </form>
       </div>
+
     </div>
   );
 }
