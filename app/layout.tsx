@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Press_Start_2P, VT323 } from "next/font/google";
+import PyodideLoader from "@/components/PyodideLoader";
 import "./globals.css";
 
 const geist = Geist({
@@ -14,6 +15,18 @@ const geistMono = Geist_Mono({
   weight: ["400", "500"],
 });
 
+const pressStart = Press_Start_2P({
+  variable: "--font-pixel",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const vt323 = VT323({
+  variable: "--font-vt",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "KnightCode — Train for BigTech interviews",
   description:
@@ -26,25 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full`}>
-      <head>
-        {/* Pyodide — Python in the browser via WebAssembly */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined') {
-                var s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.4/full/pyodide.js';
-                s.onload = function() {
-                  window.__pyodidePromise = loadPyodide();
-                };
-                document.head.appendChild(s);
-              }
-            `,
-          }}
-        />
-      </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} ${pressStart.variable} ${vt323.variable} h-full`}>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <PyodideLoader />
+      </body>
     </html>
   );
 }

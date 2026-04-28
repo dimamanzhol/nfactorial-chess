@@ -7,40 +7,60 @@ import { getProfile } from "@/lib/subscription";
 import type { User } from "@supabase/supabase-js";
 
 const T = {
-  bg: "#f7f3ee",
-  bgAlt: "#efebe4",
-  surface: "#ffffff",
-  text: "#0f0f0d",
-  textSec: "#6e6e62",
-  textMut: "#9e9e92",
-  border: "#e5e1d8",
-  green: "#16a34a",
+  bg:           "#0d0a1a",
+  surface:      "#13102a",
+  surfaceAlt:   "#1f1640",
+  border:       "#2d2250",
+  accent:       "#7c3aed",
+  accentBright: "#a78bfa",
+  text:         "#e8e0f5",
+  textSec:      "#a89cc8",
+  textMut:      "#5e4f8a",
+  gold:         "#f59e0b",
 };
 
+const PIXEL = "var(--font-pixel), monospace";
+
+const TIERS = [
+  { name: "Pawn",   icon: "♟", min: 0    },
+  { name: "Knight", icon: "♞", min: 1200 },
+  { name: "Bishop", icon: "♝", min: 1400 },
+  { name: "Rook",   icon: "♜", min: 1550 },
+  { name: "Queen",  icon: "♛", min: 1700 },
+  { name: "King",   icon: "♚", min: 1900 },
+];
+const PFP_MAP: Record<string, string> = {
+  Pawn:   "/pawn.png",
+  Knight: "/knight-pfp.png",
+  Bishop: "/bishop-pfp.png",
+  Rook:   "/rook.png",
+  Queen:  "/queen.png",
+  King:   "/mfking.png",
+};
+function getTier(elo: number) {
+  return [...TIERS].reverse().find((t) => elo >= t.min) ?? TIERS[0];
+}
+
 const NAV = [
-  { label: "Play",        href: "/dashboard/play",        icon: "♟" },
-  { label: "Leaderboard", href: "/dashboard/leaderboard", icon: "◈" },
-  { label: "History",     href: "/dashboard/history",     icon: "↺" },
-  { label: "Profile",     href: "/dashboard/profile",     icon: "◯" },
+  { label: "DASHBOARD",   href: "/dashboard/play",        icon: "⌂" },
+  { label: "LEADERBOARD", href: "/dashboard/leaderboard", icon: "🏆" },
+  { label: "PROFILE",     href: "/dashboard/profile",     icon: "👤" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [isPro, setIsPro] = useState(false);
-  const [elo, setElo] = useState(1200);
-  const [collapsed, setCollapsed] = useState(false);
+  const router   = useRouter();
+  const [user, setUser]     = useState<User | null>(null);
+  const [isPro, setIsPro]   = useState(false);
+  const [elo, setElo]       = useState(1200);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.replace("/auth"); return; }
       setUser(data.user);
-      const profile = await getProfile(data.user.id);
-      setIsPro(profile.is_pro);
-      setElo(profile.elo);
+      const p = await getProfile(data.user.id);
+      setIsPro(p.is_pro); setElo(p.elo);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) router.replace("/auth");
       else {
@@ -51,175 +71,175 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const displayName = user?.user_metadata?.full_name as string | undefined
+  const displayName = (user?.user_metadata?.full_name as string | undefined)
     ?? user?.email?.split("@")[0]
-    ?? "Player";
+    ?? "PLAYER";
 
-  const initial = displayName[0]?.toUpperCase() ?? "?";
+  const tier = getTier(elo);
+  const pfp  = PFP_MAP[tier.name];
 
   return (
-    <div style={{
-      display: "flex",
-      minHeight: "100vh",
-      background: T.bg,
-      fontFamily: "var(--font-geist), system-ui, sans-serif",
-    }}>
-      {/* Sidebar */}
+    <div style={{ display: "flex", minHeight: "100vh", background: T.bg,
+      fontFamily: "var(--font-geist), system-ui, sans-serif" }}>
+
+      {/* ── Sidebar ── */}
       <aside style={{
-        width: collapsed ? 56 : 220,
+        width: 240,
         minHeight: "100vh",
         background: T.surface,
         borderRight: `1px solid ${T.border}`,
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
-        transition: "width 0.18s ease",
         position: "sticky",
         top: 0,
         height: "100vh",
         overflow: "hidden",
+        boxShadow: `4px 0 32px rgba(124,58,237,0.12)`,
       }}>
-        {/* Logo row */}
+
+        {/* ── Logo ── */}
         <div style={{
-          height: 56,
+          padding: "20px 20px 16px",
           display: "flex",
           alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          padding: collapsed ? "0" : "0 16px 0 20px",
+          gap: 12,
           borderBottom: `1px solid ${T.border}`,
           flexShrink: 0,
         }}>
-          {!collapsed && (
-            <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: "-0.03em", color: T.text }}>
-              KnightCode
-            </span>
-          )}
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: T.textMut, fontSize: 14, padding: 4,
-              display: "flex", alignItems: "center",
-            }}
-          >
-            {collapsed ? "→" : "←"}
-          </button>
+          <div style={{
+            width: 36, height: 36,
+            background: `${T.accent}30`,
+            border: `2px solid ${T.accent}`,
+            borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18,
+          }}>
+            ♛
+          </div>
+          <span style={{
+            fontFamily: PIXEL,
+            fontSize: 11,
+            color: T.text,
+            letterSpacing: "0.06em",
+          }}>
+            KNIGHTCODE
+          </span>
         </div>
 
-        {/* Nav items */}
-        <nav style={{ flex: 1, padding: "12px 0", display: "flex", flexDirection: "column", gap: 2 }}>
+        {/* ── User card ── */}
+        <div style={{
+          margin: "16px 12px",
+          padding: "14px",
+          background: `${T.accent}12`,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8,
+          flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* PFP */}
+            <div style={{
+              width: 56, height: 56,
+              borderRadius: 6,
+              border: `2px solid ${T.accent}60`,
+              backgroundImage: pfp ? `url('${pfp}')` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center 20%",
+              background: pfp ? undefined : T.surfaceAlt,
+              flexShrink: 0,
+              imageRendering: "pixelated",
+            }} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{
+                margin: "0 0 3px",
+                fontSize: 13, fontWeight: 600,
+                color: T.text,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                margin: "0 0 4px",
+                fontFamily: PIXEL, fontSize: 8,
+                color: T.accentBright, letterSpacing: "0.06em",
+              }}>
+                {tier.icon} {tier.name.toUpperCase()}{isPro ? " · PRO" : ""}
+              </p>
+              <p style={{
+                margin: 0,
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: 12, color: T.gold, fontWeight: 700,
+              }}>
+                🏆 {elo} <span style={{ color: T.textMut, fontWeight: 400, fontSize: 11 }}>ELO</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Nav ── */}
+        <nav style={{ flex: 1, padding: "4px 0", display: "flex", flexDirection: "column" }}>
           {NAV.map(({ label, href, icon }) => {
-            const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+            const active = pathname === href || pathname.startsWith(href);
             return (
               <a
                 key={href}
                 href={href}
-                title={collapsed ? label : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
-                  padding: collapsed ? "10px 0" : "9px 20px",
-                  justifyContent: collapsed ? "center" : "flex-start",
+                  gap: 14,
+                  padding: "13px 20px",
                   textDecoration: "none",
-                  borderRadius: "0 8px 8px 0",
-                  marginRight: 8,
-                  background: active ? T.bgAlt : "transparent",
-                  color: active ? T.text : T.textSec,
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 13,
-                  borderLeft: active ? `2px solid ${T.text}` : "2px solid transparent",
-                  transition: "background 0.12s",
+                  color: active ? T.text : T.textMut,
+                  background: active ? T.surfaceAlt : "transparent",
+                  borderLeft: active ? `3px solid ${T.accent}` : "3px solid transparent",
+                  transition: "background 0.12s, color 0.12s",
+                  fontFamily: PIXEL,
+                  fontSize: 10,
+                  letterSpacing: "0.06em",
                 }}
               >
-                <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
-                {!collapsed && <span>{label}</span>}
+                <span style={{ fontSize: 16, lineHeight: 1, width: 20, textAlign: "center", flexShrink: 0 }}>
+                  {icon}
+                </span>
+                {label}
               </a>
             );
           })}
         </nav>
 
-        {/* Bottom section */}
-        <div style={{ borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
-          {/* Pro upsell */}
-          {!isPro && !collapsed && (
-            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}` }}>
-              <a
-                href="/pricing"
-                style={{
-                  display: "block",
-                  padding: "8px 12px",
-                  background: T.bgAlt,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 8,
-                  textDecoration: "none",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: T.green,
-                  textAlign: "center",
-                }}
-              >
-                Upgrade to Pro →
-              </a>
-            </div>
-          )}
-
-          {/* User row */}
-          <div style={{
-            padding: collapsed ? "14px 0" : "14px 16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            gap: 10,
-          }}>
-            {/* Avatar */}
-            <div style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: T.bgAlt, border: `1.5px solid ${T.border}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: T.text, flexShrink: 0,
+        {/* ── Bottom: upgrade + log out ── */}
+        <div style={{ padding: "12px", borderTop: `1px solid ${T.border}`, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {!isPro && (
+            <a href="/pricing" style={{
+              display: "block", padding: "9px 12px", textAlign: "center",
+              background: `${T.accent}20`, border: `1px solid ${T.accent}50`,
+              borderRadius: 6, textDecoration: "none",
+              fontFamily: PIXEL, fontSize: 8, color: T.accentBright,
+              letterSpacing: "0.06em",
             }}>
-              {initial}
-            </div>
-
-            {!collapsed && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: T.text, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayName}
-                </p>
-                <p style={{ fontSize: 11, color: T.textMut, margin: 0, fontFamily: "var(--font-geist-mono), monospace" }}>
-                  {elo} ELO{isPro && <span style={{ color: T.green, marginLeft: 6 }}>PRO</span>}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Sign out */}
-          {!collapsed && (
-            <div style={{ padding: "0 16px 14px" }}>
-              <button
-                onClick={async () => { await signOut(); router.replace("/"); }}
-                style={{
-                  width: "100%",
-                  padding: "7px 0",
-                  background: "none",
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: T.textMut,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Sign out
-              </button>
-            </div>
+              ⚡ UPGRADE TO PRO
+            </a>
           )}
+          <button
+            onClick={async () => { await signOut(); router.replace("/"); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "11px 8px",
+              background: "none", border: "none",
+              cursor: "pointer", width: "100%",
+              fontFamily: PIXEL, fontSize: 9,
+              color: T.textMut, letterSpacing: "0.06em",
+            }}
+          >
+            <span style={{ fontSize: 16 }}>⇥</span>
+            LOG OUT
+          </button>
         </div>
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: T.bg }}>
         {children}
       </main>
     </div>

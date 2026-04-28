@@ -6,46 +6,46 @@ import { EditorView } from "@codemirror/view";
 import { createTheme } from "@uiw/codemirror-themes";
 import { tags as t } from "@lezer/highlight";
 
-const knightLight = createTheme({
-  theme: "light",
+const knightDark = createTheme({
+  theme: "dark",
   settings: {
-    background: "#f7f3ee",
+    background: "#160f2e",
     backgroundImage: "",
-    foreground: "#0f0f0d",
-    caret: "#0f0f0d",
-    selection: "#d9d2c8",
-    selectionMatch: "#d9d2c8",
-    lineHighlight: "#edeae4",
-    gutterBackground: "#efebe4",
-    gutterForeground: "#9e9e92",
-    gutterBorder: "#e5e1d8",
-    gutterActiveForeground: "#0f0f0d",
+    foreground: "#e8e0f5",
+    caret: "#a78bfa",
+    selection: "#3d2b6e",
+    selectionMatch: "#3d2b6e",
+    lineHighlight: "#1f1640",
+    gutterBackground: "#1a1535",
+    gutterForeground: "#5e4f8a",
+    gutterBorder: "#2d2250",
+    gutterActiveForeground: "#a78bfa",
     fontFamily: "var(--font-geist-mono), 'Geist Mono', monospace",
   },
   styles: [
-    { tag: t.comment, color: "#9e9e92", fontStyle: "italic" },
-    { tag: t.keyword, color: "#6b4fbb", fontWeight: "600" },
-    { tag: t.string, color: "#126d3e" },
-    { tag: t.number, color: "#c2410c" },
-    { tag: t.bool, color: "#6b4fbb" },
-    { tag: t.null, color: "#6b4fbb" },
-    { tag: t.variableName, color: "#0f0f0d" },
-    { tag: t.definition(t.variableName), color: "#1d4ed8" },
-    { tag: t.function(t.variableName), color: "#0e6f91" },
-    { tag: t.typeName, color: "#0e6f91" },
-    { tag: t.propertyName, color: "#374151" },
-    { tag: t.operator, color: "#374151" },
-    { tag: t.punctuation, color: "#374151" },
+    { tag: t.comment,                    color: "#5e4f8a", fontStyle: "italic" },
+    { tag: t.keyword,                    color: "#a78bfa", fontWeight: "600" },
+    { tag: t.string,                     color: "#22c55e" },
+    { tag: t.number,                     color: "#f59e0b" },
+    { tag: t.bool,                       color: "#a78bfa" },
+    { tag: t.null,                       color: "#a78bfa" },
+    { tag: t.variableName,               color: "#e8e0f5" },
+    { tag: t.definition(t.variableName), color: "#c4b5fd" },
+    { tag: t.function(t.variableName),   color: "#60a5fa" },
+    { tag: t.typeName,                   color: "#60a5fa" },
+    { tag: t.propertyName,               color: "#a89cc8" },
+    { tag: t.operator,                   color: "#a89cc8" },
+    { tag: t.punctuation,                color: "#a89cc8" },
   ],
 });
 
 const baseTheme = EditorView.theme({
-  "&": { height: "100%", fontSize: "12.5px" },
-  ".cm-scroller": { overflow: "auto", lineHeight: "1.65" },
-  ".cm-content": { padding: "12px 0" },
-  ".cm-gutters": { borderRight: "1px solid #e5e1d8" },
-  ".cm-lineNumbers .cm-gutterElement": { minWidth: "40px", paddingRight: "12px" },
-  ".cm-focused": { outline: "none" },
+  "&":                                          { height: "100%", fontSize: "12.5px" },
+  ".cm-scroller":                               { overflow: "auto", lineHeight: "1.65" },
+  ".cm-content":                                { padding: "12px 0" },
+  ".cm-gutters":                                { borderRight: "1px solid #2d2250" },
+  ".cm-lineNumbers .cm-gutterElement":          { minWidth: "40px", paddingRight: "12px" },
+  ".cm-focused":                                { outline: "none" },
 });
 
 interface Props {
@@ -58,7 +58,7 @@ export default function CodeEditor({ value, onChange }: Props) {
     <CodeMirror
       value={value}
       height="100%"
-      theme={knightLight}
+      theme={knightDark}
       extensions={[python(), baseTheme]}
       onChange={onChange}
       basicSetup={{

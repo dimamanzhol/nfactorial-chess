@@ -8,58 +8,83 @@ import { getProfile } from "@/lib/subscription";
 import { joinQueue, cancelQueue } from "@/lib/matchmaking";
 
 const T = {
-  bg: "#f7f3ee",
-  bgAlt: "#efebe4",
-  bgDeep: "#e8e2d9",
-  surface: "#ffffff",
-  text: "#0f0f0d",
-  textSec: "#6e6e62",
-  textMut: "#9e9e92",
-  border: "#e5e1d8",
-  green: "#16a34a",
-  red: "#dc2626",
+  bg:           "#0d0a1a",
+  surface:      "#13102a",
+  border:       "#2d2250",
+  accent:       "#7c3aed",
+  accentBright: "#a78bfa",
+  text:         "#e8e0f5",
+  textSec:      "#a89cc8",
+  textMut:      "#5e4f8a",
+  green:        "#22c55e",
+  greenDark:    "#14532d",
+  greenBorder:  "#166534",
+  gold:         "#ca8a04",
+  goldBright:   "#f59e0b",
+  goldDark:     "#451a03",
+  goldBorder:   "#92400e",
+  red:          "#ef4444",
 };
+
+const PIXEL = "var(--font-pixel), monospace";
+const MONO  = "var(--font-geist-mono), monospace";
 
 export default function PlayPage() {
   const router = useRouter();
-  const [isPro, setIsPro] = useState(false);
-  const [elo, setElo] = useState(1200);
-  const [userId, setUserId] = useState("");
-  const [roomCode, setRoomCode] = useState("");
-  const [timeLimit, setTimeLimit] = useState(180);
+  const [displayName, setDisplayName] = useState("PLAYER");
+  const [isPro, setIsPro]       = useState(false);
+  const [elo, setElo]           = useState(1200);
+  const [userId, setUserId]     = useState("");
+
+  /* friend card state */
+  const [friendOpen, setFriendOpen] = useState(false);
+  const [roomCode, setRoomCode]     = useState("");
+  const [timeLimit, setTimeLimit]   = useState(180);
   const [difficulty, setDifficulty] = useState("easy");
-  const [creating, setCreating] = useState(false);
-  const [joining, setJoining] = useState(false);
-  const [searching, setSearching] = useState(false);
+  const [creating, setCreating]     = useState(false);
+  const [joining, setJoining]       = useState(false);
+
+  /* ranked state */
+  const [searching, setSearching]       = useState(false);
   const [searchElapsed, setSearchElapsed] = useState(0);
+
   const [error, setError] = useState("");
 
-  const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const searchRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       setUserId(data.user.id);
+      const name = (data.user.user_metadata?.full_name as string | undefined)
+        ?? data.user.email?.split("@")[0]
+        ?? "PLAYER";
+      setDisplayName(name.toUpperCase());
       const profile = await getProfile(data.user.id);
       setIsPro(profile.is_pro);
       setElo(profile.elo);
     });
     return () => {
-      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
-      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+      if (searchRef.current)  clearInterval(searchRef.current);
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
     };
   }, []);
 
+  /* ── handlers ── */
   async function handleCreate() {
     setCreating(true); setError("");
     try {
       const id = await getPlayerId();
       if (!isPro) {
         const today = new Date(); today.setHours(0, 0, 0, 0);
-        const { count } = await supabase.from("games").select("id", { count: "exact", head: true })
+        const { count } = await supabase.from("games")
+          .select("id", { count: "exact", head: true })
           .eq("player_white", id).gte("created_at", today.toISOString());
-        if ((count ?? 0) >= 5) { setError("5-game daily limit reached. Upgrade to Pro →"); setCreating(false); return; }
+        if ((count ?? 0) >= 5) {
+          setError("5-game daily limit reached. Upgrade to Pro →");
+          setCreating(false); return;
+        }
       }
       const game = await createGame(id, isPro ? timeLimit : 180, isPro ? difficulty : "easy");
       router.push(`/game/${game.id}?color=white`);
@@ -78,19 +103,21 @@ export default function PlayPage() {
   async function handleFindOpponent() {
     setError(""); setSearching(true); setSearchElapsed(0);
     try {
-      const id = await getPlayerId();
+      const id   = await getPlayerId();
       const entryId = await joinQueue(id, elo);
-      elapsedIntervalRef.current = setInterval(() => setSearchElapsed((s) => s + 1), 1000);
-      searchIntervalRef.current = setInterval(async () => {
+      elapsedRef.current = setInterval(() => setSearchElapsed((s) => s + 1), 1000);
+      searchRef.current  = setInterval(async () => {
         try {
-          const { data: own } = await supabase.from("matchmaking").select("status, game_id").eq("id", entryId).single();
+          const { data: own } = await supabase.from("matchmaking")
+            .select("status, game_id").eq("id", entryId).single();
           if (own?.status === "matched" && own.game_id) {
             clearAll();
-            const { data: g } = await supabase.from("games").select("player_white").eq("id", own.game_id).single();
+            const { data: g } = await supabase.from("games")
+              .select("player_white").eq("id", own.game_id).single();
             router.push(`/game/${own.game_id}?color=${g?.player_white === id ? "white" : "black"}`);
             return;
           }
-          const res = await fetch("/api/matchmaking", {
+          const res  = await fetch("/api/matchmaking", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ playerId: id, entryId, elo }),
           });
@@ -102,8 +129,8 @@ export default function PlayPage() {
   }
 
   function clearAll() {
-    if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
-    if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    if (searchRef.current)  clearInterval(searchRef.current);
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
     setSearching(false);
   }
 
@@ -114,286 +141,381 @@ export default function PlayPage() {
 
   const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-  return (
-    <div style={{ padding: "44px 48px", maxWidth: 1000, width: "100%" }}>
+  /* ── shared pixel-btn style ── */
+  function pixelBtn(bg: string, hover?: string): React.CSSProperties {
+    return {
+      width: "100%", padding: "14px 20px",
+      background: bg, color: "#fff",
+      border: "none", borderRadius: 4,
+      fontSize: 13, fontWeight: 700,
+      fontFamily: PIXEL, letterSpacing: "0.06em",
+      cursor: "pointer",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      imageRendering: "pixelated",
+    };
+  }
 
-      {/* Page header */}
-      <div style={{ marginBottom: 36 }}>
-        <p style={{
-          fontSize: 11, color: T.textMut,
-          fontFamily: "var(--font-geist-mono), monospace",
-          letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12,
-        }}>
-          Game modes
+  return (
+    <div style={{ padding: "40px 44px", background: T.bg, minHeight: "100vh" }}>
+
+      {/* ── Welcome header ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, color: T.textSec, margin: "0 0 6px",
+          fontFamily: MONO, letterSpacing: "0.1em" }}>
+          WELCOME BACK,{" "}
+          <span style={{ color: T.accentBright }}>{displayName}</span>{" "}👋
         </p>
-        <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.04em", color: T.text, lineHeight: 1 }}>
-          How do you want<br />
-          <span style={{ color: T.textSec }}>to play today?</span>
+        <h1 style={{ margin: 0, lineHeight: 1.1 }}>
+          <span style={{ fontFamily: PIXEL, fontSize: 28, color: T.text, display: "block", marginBottom: 4 }}>
+            How do you want
+          </span>
+          <span style={{ fontFamily: PIXEL, fontSize: 28, color: T.accentBright }}>
+            to play today?
+          </span>
         </h1>
       </div>
 
-      {/* Cards grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      {/* ── 3 game mode cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
 
-        {/* ── VS FRIEND — large left card ── */}
+        {/* ── VS AI ── */}
         <div style={{
-          gridRow: "1 / 3",
-          background: T.surface,
-          border: `1.5px solid ${T.border}`,
-          borderRadius: 20,
-          padding: 32,
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 2px 16px rgba(0,0,0,0.04)",
-        }}>
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-              color: T.textMut, fontFamily: "var(--font-geist-mono), monospace",
-            }}>
-              vs Friend
-            </span>
-            <span style={{ fontSize: 44, lineHeight: 1, opacity: 0.12 }}>♜</span>
-          </div>
-
-          <h2 style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.04em", color: T.text, lineHeight: 1.05, marginBottom: 10 }}>
-            Challenge<br />a friend
-          </h2>
-          <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.65, marginBottom: 28 }}>
-            Create a private room, share the code, and compete head-to-head.
-          </p>
-
-          {/* How it works — fills vertical space */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-            {[
-              { n: "01", t: "Create a room", d: "Generates a 6-letter code" },
-              { n: "02", t: "Share the code", d: "Send it to your opponent" },
-              { n: "03", t: "Solve to move", d: "First to solve earns the move" },
-            ].map(({ n, t, d }) => (
-              <div key={n} style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "12px 14px", background: T.bg,
-                borderRadius: 10, border: `1px solid ${T.border}`,
-              }}>
-                <span style={{
-                  fontSize: 10, fontFamily: "var(--font-geist-mono), monospace",
-                  color: T.textMut, letterSpacing: "0.06em", flexShrink: 0,
-                }}>{n}</span>
-                <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: T.text, margin: 0 }}>{t}</p>
-                  <p style={{ fontSize: 11, color: T.textMut, margin: 0 }}>{d}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pro settings */}
-          {isPro && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-              <div>
-                <p style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 7 }}>Difficulty</p>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(["easy", "medium", "hard"] as const).map((d) => (
-                    <button key={d} onClick={() => setDifficulty(d)} style={{
-                      flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600, textTransform: "capitalize",
-                      background: difficulty === d ? T.text : T.bg,
-                      color: difficulty === d ? "#fff" : T.textSec,
-                      border: `1.5px solid ${difficulty === d ? T.text : T.border}`,
-                      borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
-                    }}>{d}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p style={{ fontSize: 10, color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 7 }}>Time per turn</p>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {([60, 180, 300] as const).map((s) => (
-                    <button key={s} onClick={() => setTimeLimit(s)} style={{
-                      flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
-                      background: timeLimit === s ? T.text : T.bg,
-                      color: timeLimit === s ? "#fff" : T.textSec,
-                      border: `1.5px solid ${timeLimit === s ? T.text : T.border}`,
-                      borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace",
-                    }}>{s === 60 ? "1 min" : s === 180 ? "3 min" : "5 min"}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-            <button onClick={handleCreate} disabled={creating} style={{
-              padding: "14px", background: T.text, color: "#fff", border: "none",
-              borderRadius: 12, fontSize: 14, fontWeight: 700,
-              cursor: creating ? "wait" : "pointer", opacity: creating ? 0.7 : 1,
-              fontFamily: "inherit", letterSpacing: "-0.01em",
-            }}>
-              {creating ? "Creating room…" : "Create Room →"}
-            </button>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: T.border }} />
-              <span style={{ fontSize: 11, color: T.textMut }}>or join with a code</span>
-              <div style={{ flex: 1, height: 1, background: T.border }} />
-            </div>
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase().slice(0, 6))}
-                placeholder="XXXXXX"
-                maxLength={6}
-                onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-                style={{
-                  flex: 1, padding: "12px 14px",
-                  border: `1.5px solid ${T.border}`, borderRadius: 10,
-                  fontSize: 15, fontFamily: "var(--font-geist-mono), monospace",
-                  letterSpacing: "0.2em", fontWeight: 700,
-                  background: T.bg, color: T.text, outline: "none",
-                }}
-              />
-              <button onClick={handleJoin} disabled={joining} style={{
-                padding: "12px 22px", background: T.bgAlt, color: T.text,
-                border: `1.5px solid ${T.border}`, borderRadius: 10,
-                fontSize: 13, fontWeight: 700, cursor: joining ? "wait" : "pointer",
-                fontFamily: "inherit", whiteSpace: "nowrap",
-              }}>
-                {joining ? "…" : "Join"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── VS AI — top right ── */}
-        <div style={{
-          background: T.bgAlt,
-          border: `1.5px solid ${T.border}`,
-          borderRadius: 20, padding: 28,
-          display: "flex", flexDirection: "column",
+          background: "#110d24",
+          border: `2px solid ${T.accent}60`,
+          borderRadius: 8,
+          padding: "28px 24px 24px",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          boxShadow: `0 0 40px ${T.accent}20, inset 0 0 40px ${T.accent}08`,
           position: "relative", overflow: "hidden",
-          boxShadow: "0 2px 16px rgba(0,0,0,0.03)",
         }}>
-          <span style={{
-            position: "absolute", right: 16, top: 16,
-            fontSize: 88, lineHeight: 1, opacity: 0.07, userSelect: "none",
-          }}>♞</span>
+          {/* purple sparkles */}
+          {["12% 15%","80% 20%","20% 75%"].map((pos, i) => (
+            <div key={i} style={{
+              position: "absolute", left: pos.split(" ")[0], top: pos.split(" ")[1],
+              width: 4, height: 4, background: T.accentBright, borderRadius: 0,
+              opacity: 0.6, imageRendering: "pixelated",
+            }} />
+          ))}
 
-          <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-            color: T.textMut, fontFamily: "var(--font-geist-mono), monospace", marginBottom: 12,
-          }}>
-            vs AI
-          </span>
-          <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", color: T.text, lineHeight: 1.1, marginBottom: 8 }}>
-            Play against<br />Stockfish
-          </h2>
-          <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.6, marginBottom: 24 }}>
-            No waiting. Practice your coding under pressure anytime.
-          </p>
-
-          <a href="/game/ai" style={{
-            display: "block", padding: "13px", textAlign: "center",
-            background: T.surface, color: T.text, border: `1.5px solid ${T.border}`,
-            borderRadius: 10, textDecoration: "none", fontSize: 13, fontWeight: 700,
-            marginTop: "auto", letterSpacing: "-0.01em",
-          }}>
-            Play now →
-          </a>
-        </div>
-
-        {/* ── RANKED — bottom right ── */}
-        <div style={{
-          background: T.text,
-          border: `1.5px solid ${T.text}`,
-          borderRadius: 20, padding: 28,
-          display: "flex", flexDirection: "column",
-          position: "relative", overflow: "hidden",
-          boxShadow: "0 4px 24px rgba(15,15,13,0.18)",
-        }}>
-          <span style={{
-            position: "absolute", right: 16, bottom: 12,
-            fontSize: 88, lineHeight: 1, opacity: 0.07,
-            color: "#fff", userSelect: "none",
-          }}>♛</span>
-
-          <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-            color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-geist-mono), monospace", marginBottom: 12,
-          }}>
-            Ranked
-          </span>
-          <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", lineHeight: 1.1, marginBottom: 8 }}>
-            Compete for<br />ELO rating
-          </h2>
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, marginBottom: 20 }}>
-            Matched by skill. Win to climb, lose to fall.
-          </p>
-
+          {/* piece art */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 9, padding: "10px 14px", marginBottom: 20, width: "fit-content",
-          }}>
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em" }}>YOUR ELO</span>
-            <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "-0.02em" }}>{elo}</span>
-          </div>
+            width: 140, height: 140,
+            backgroundImage: "url('/mfking.png')",
+            backgroundSize: "contain", backgroundRepeat: "no-repeat",
+            backgroundPosition: "center bottom",
+            imageRendering: "pixelated",
+            marginBottom: 16,
+            filter: `drop-shadow(0 0 24px ${T.accent}90)`,
+          }} />
 
-          <div style={{ marginTop: "auto" }}>
-            {searching ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{
-                  padding: "12px 16px", background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                }}>
-                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Searching</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: "var(--font-geist-mono), monospace" }}>
-                      {fmtTime(searchElapsed)}
-                    </span>
-                    <div style={{ display: "flex", gap: 3 }}>
-                      {[0, 1, 2].map((i) => (
-                        <div key={i} style={{
-                          width: 5, height: 5, borderRadius: "50%",
-                          background: "rgba(255,255,255,0.35)",
-                          animation: `pulse 1.2s ${i * 0.2}s ease-in-out infinite`,
-                        }} />
-                      ))}
-                    </div>
+          <p style={{ fontFamily: PIXEL, fontSize: 14, color: T.text,
+            letterSpacing: "0.06em", margin: "0 0 10px", textAlign: "center" }}>
+            PLAY VS AI
+          </p>
+          <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.6,
+            textAlign: "center", margin: 0 }}>
+            Challenge the engine.<br />Solve problems and make<br />your moves.
+          </p>
+
+          <div style={{ marginTop: "auto", width: "100%", paddingTop: 20 }}>
+            <a href="/game/ai" style={{
+              ...pixelBtn(T.accent),
+              textDecoration: "none",
+              boxShadow: `0 0 16px ${T.accent}80`,
+              borderRadius: 4,
+            }}>
+              <span>PLAY NOW</span>
+              <span style={{ fontSize: 16 }}>›</span>
+            </a>
+          </div>
+        </div>
+
+        {/* ── VS FRIEND ── */}
+        <div style={{
+          background: "#0c1a0f",
+          border: `2px solid ${T.greenBorder}`,
+          borderRadius: 8,
+          padding: "28px 24px 24px",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          boxShadow: `0 0 40px ${T.green}10, inset 0 0 40px ${T.green}05`,
+          position: "relative", overflow: "hidden",
+        }}>
+          {/* piece art — two knights */}
+          <div style={{
+            width: 160, height: 140,
+            backgroundImage: "url('/knight-pfp.png')",
+            backgroundSize: "contain", backgroundRepeat: "no-repeat",
+            backgroundPosition: "center bottom",
+            imageRendering: "pixelated",
+            marginBottom: 16,
+            filter: `drop-shadow(0 0 20px ${T.green}60)`,
+          }} />
+
+          <p style={{ fontFamily: PIXEL, fontSize: 14, color: T.text,
+            letterSpacing: "0.06em", margin: "0 0 10px", textAlign: "center" }}>
+            PLAY WITH FRIEND
+          </p>
+          <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.6,
+            textAlign: "center", margin: 0 }}>
+            Create a room or join<br />your friend using<br />a room code.
+          </p>
+
+          <div style={{ marginTop: "auto", width: "100%", paddingTop: 20 }}>
+          {!friendOpen ? (
+            <button
+              onClick={() => setFriendOpen(true)}
+              style={{
+                ...pixelBtn("#15803d"),
+                boxShadow: `0 0 16px ${T.green}50`,
+              }}
+            >
+              <span>CREATE / JOIN ROOM</span>
+              <span style={{ fontSize: 16 }}>›</span>
+            </button>
+          ) : (
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Pro settings */}
+              {isPro && (
+                <>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["easy","medium","hard"] as const).map((d) => (
+                      <button key={d} onClick={() => setDifficulty(d)} style={{
+                        flex: 1, padding: "6px 0", fontSize: 9, fontWeight: 700,
+                        fontFamily: PIXEL, letterSpacing: "0.04em", cursor: "pointer",
+                        background: difficulty === d ? "#15803d" : "#0c1a0f",
+                        color: difficulty === d ? "#fff" : T.textMut,
+                        border: `1.5px solid ${difficulty === d ? T.green : T.greenBorder}`,
+                        borderRadius: 4, textTransform: "capitalize",
+                      }}>{d}</button>
+                    ))}
                   </div>
-                </div>
-                <button onClick={handleCancel} style={{
-                  padding: "11px", background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
-                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {([60,180,300] as const).map((s) => (
+                      <button key={s} onClick={() => setTimeLimit(s)} style={{
+                        flex: 1, padding: "6px 0", fontSize: 9, fontWeight: 700,
+                        fontFamily: PIXEL, cursor: "pointer",
+                        background: timeLimit === s ? "#15803d" : "#0c1a0f",
+                        color: timeLimit === s ? "#fff" : T.textMut,
+                        border: `1.5px solid ${timeLimit === s ? T.green : T.greenBorder}`,
+                        borderRadius: 4,
+                      }}>{s === 60 ? "1m" : s === 180 ? "3m" : "5m"}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button onClick={handleCreate} disabled={creating} style={{
+                ...pixelBtn("#15803d"),
+                justifyContent: "center", gap: 8,
+                opacity: creating ? 0.7 : 1, cursor: creating ? "wait" : "pointer",
+              }}>
+                {creating ? "CREATING…" : "CREATE ROOM"}
+              </button>
+
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase().slice(0, 6))}
+                  placeholder="XXXXXX"
+                  maxLength={6}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+                  style={{
+                    flex: 1, padding: "10px 12px",
+                    background: "#0a1a0c", border: `1.5px solid ${T.greenBorder}`,
+                    borderRadius: 4, fontSize: 14, fontFamily: MONO,
+                    letterSpacing: "0.18em", fontWeight: 700,
+                    color: T.text, outline: "none",
+                  }}
+                />
+                <button onClick={handleJoin} disabled={joining} style={{
+                  padding: "10px 14px", background: "#15803d", color: "#fff",
+                  border: "none", borderRadius: 4, fontSize: 11,
+                  fontFamily: PIXEL, cursor: joining ? "wait" : "pointer",
+                  whiteSpace: "nowrap",
                 }}>
-                  Cancel
+                  {joining ? "…" : "JOIN"}
                 </button>
               </div>
-            ) : (
-              <button onClick={handleFindOpponent} style={{
-                width: "100%", padding: "14px", background: "#fff", color: T.text,
-                border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800,
-                cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em",
+
+              <button onClick={() => setFriendOpen(false)} style={{
+                background: "none", border: "none", color: T.textMut,
+                fontSize: 11, cursor: "pointer", fontFamily: MONO,
+                textAlign: "center", padding: "4px 0",
               }}>
-                Find Opponent →
+                ← back
               </button>
-            )}
+            </div>
+          )}
           </div>
+        </div>
+
+        {/* ── RANKED ARENA ── */}
+        <div style={{
+          background: "#1a1100",
+          border: `2px solid ${T.goldBorder}`,
+          borderRadius: 8,
+          padding: "28px 24px 24px",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          boxShadow: `0 0 40px ${T.goldBright}10, inset 0 0 40px ${T.gold}05`,
+          position: "relative", overflow: "hidden",
+        }}>
+          {/* piece art + ELO overlay */}
+          <div style={{ position: "relative", width: 140, height: 140, marginBottom: 16 }}>
+            <div style={{
+              width: 140, height: 140,
+              backgroundImage: "url('/queen.png')",
+              backgroundSize: "contain", backgroundRepeat: "no-repeat",
+              backgroundPosition: "center bottom",
+              imageRendering: "pixelated",
+              filter: `drop-shadow(0 0 24px ${T.gold}90)`,
+            }} />
+            {/* ELO badge overlay */}
+            <div style={{
+              position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)",
+              display: "flex", alignItems: "center", gap: 5,
+              background: "#1a1100", border: `1px solid ${T.goldBorder}`,
+              borderRadius: 4, padding: "4px 10px", whiteSpace: "nowrap",
+              boxShadow: `0 0 8px ${T.gold}60`,
+            }}>
+              <span style={{ fontSize: 11 }}>🏆</span>
+              <span style={{ fontFamily: PIXEL, fontSize: 9, color: T.goldBright, letterSpacing: "0.04em" }}>
+                {elo} ELO
+              </span>
+            </div>
+          </div>
+
+          <p style={{ fontFamily: PIXEL, fontSize: 14, color: T.text,
+            letterSpacing: "0.06em", margin: "0 0 10px", textAlign: "center" }}>
+            RANKED ARENA
+          </p>
+          <p style={{ fontSize: 13, color: T.textSec, lineHeight: 1.6,
+            textAlign: "center", margin: 0 }}>
+            Compete with the best<br />coders. Climb the<br />leaderboard.
+          </p>
+
+          <div style={{ marginTop: "auto", width: "100%", paddingTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+
+          {searching ? (
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{
+                padding: "12px 16px", background: `${T.gold}15`,
+                border: `1px solid ${T.goldBorder}`, borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{ fontSize: 11, color: T.textSec, fontFamily: PIXEL, letterSpacing: "0.05em" }}>SEARCHING</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: T.goldBright, fontFamily: MONO }}>
+                    {fmtTime(searchElapsed)}
+                  </span>
+                  <div style={{ display: "flex", gap: 3 }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{
+                        width: 4, height: 4,
+                        background: T.goldBright,
+                        animation: `pulse 1.2s ${i * 0.2}s ease-in-out infinite`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button onClick={handleCancel} style={{
+                ...pixelBtn(`${T.gold}30`),
+                justifyContent: "center",
+                color: T.goldBright, border: `1px solid ${T.goldBorder}`,
+                fontSize: 11,
+              }}>
+                CANCEL
+              </button>
+            </div>
+          ) : (
+            <button onClick={handleFindOpponent} style={{
+              ...pixelBtn(T.gold),
+              boxShadow: `0 0 16px ${T.gold}60`,
+            }}>
+              <span>PLAY RANKED</span>
+              <span style={{ fontSize: 16 }}>›</span>
+            </button>
+          )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Daily Quest bar ── */}
+      <div style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: 8,
+        padding: "18px 24px",
+        display: "flex", alignItems: "center", gap: 20,
+      }}>
+        {/* quest icon */}
+        <div style={{
+          width: 44, height: 44, flexShrink: 0,
+          backgroundImage: "url('/pawn.png')",
+          backgroundSize: "contain", backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          imageRendering: "pixelated",
+          opacity: 0.85,
+        }} />
+
+        {/* quest info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: PIXEL, fontSize: 9, color: T.accentBright,
+            letterSpacing: "0.1em", margin: "0 0 5px" }}>
+            DAILY QUEST
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <p style={{ fontSize: 13, color: T.text, margin: 0, fontWeight: 500 }}>
+              Win 2 games today
+            </p>
+            <span style={{ fontSize: 12, color: T.accentBright, fontFamily: MONO, fontWeight: 700 }}>
+              1 / 2
+            </span>
+          </div>
+          {/* progress bar */}
+          <div style={{
+            marginTop: 8, height: 4, borderRadius: 2,
+            background: T.border, overflow: "hidden",
+          }}>
+            <div style={{
+              width: "50%", height: "100%",
+              background: `linear-gradient(90deg, ${T.accent}, ${T.accentBright})`,
+              borderRadius: 2,
+            }} />
+          </div>
+        </div>
+
+        {/* reward */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 12, color: T.textMut, fontFamily: MONO, letterSpacing: "0.08em" }}>REWARD:</span>
+            <span style={{ fontSize: 13, color: T.accentBright, fontWeight: 700, fontFamily: MONO }}>💎 150</span>
+            <span style={{ fontSize: 13, color: T.goldBright, fontWeight: 700, fontFamily: MONO }}>⚡ 300 XP</span>
+          </div>
+          <button style={{
+            padding: "10px 16px",
+            background: T.surfaceAlt ?? T.surface,
+            border: `1px solid ${T.border}`,
+            borderRadius: 4, color: T.text,
+            fontFamily: PIXEL, fontSize: 9,
+            letterSpacing: "0.06em", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            VIEW QUESTS <span style={{ fontSize: 14 }}>›</span>
+          </button>
         </div>
       </div>
 
       {error && (
-        <p style={{ fontSize: 13, color: T.red, marginTop: 16, fontWeight: 500 }}>{error}</p>
+        <p style={{ fontSize: 13, color: T.red, marginTop: 14, fontWeight: 500 }}>{error}</p>
       )}
 
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
-          50% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 1;   transform: scale(1.2); }
         }
+        input::placeholder { color: #5e4f8a; letter-spacing: 0.18em; }
       `}</style>
     </div>
   );

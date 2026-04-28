@@ -39,6 +39,8 @@ body {
   font-family: var(--font-geist), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #0d0a1a;
+  color: #e8e0f5;
 }
 
 /* Utility: mono label */
