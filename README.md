@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ♟️ KnightCode
 
-## Getting Started
+> Шахматы встречают LeetCode. Заработай ход — реши задачу.
 
-First, run the development server:
+## Что это такое?
+
+KnightCode — это соревновательная игра, в которой **сделать ход на шахматной доске можно только после того, как решишь задачу по программированию.**
+
+Два игрока играют на обычной шахматной доске. Ты выбираешь ход — но фигура не двинется, пока не решишь алгоритмическую задачу во встроенном редакторе кода. Решил за 3 минуты → ход выполнен. Не успел → ход пропущен, очередь переходит к противнику.
+
+## Для кого?
+
+Для разработчиков, которые хотят прокачать навык решения задач под давлением — именно так, как это бывает на реальных технических собеседованиях. Вместо того чтобы в одиночестве листать LeetCode, ты соревнуешься с живым человеком под таймер.
+
+## Почему это ценно?
+
+Подготовка к интервью — это скучно и одиноко. На LeetCode нет ставок, нет адреналина, нет противника. KnightCode это исправляет:
+
+- **Настоящее давление** — соперник смотрит, таймер тикает, ошибка стоит хода
+- **Настоящая практика** — реальные алгоритмические задачи от Easy до Hard на JS и Python
+- **Это реально интересно** — ты не гриндишь задачи, ты играешь в игру
+
+Ранговый режим с системой ELO и матчмейкингом позволяет отслеживать прогресс и подниматься в таблице лидеров.
+
+## Дизайн
+
+Весь визуал выполнен в стиле **Terraria** — пиксельная эстетика, тёмная тема, зернистые текстуры и пиксельные шахматные фигуры. Интерфейс намеренно передаёт атмосферу ретро-игры: никаких скучных форм, только пиксельные рамки, анимации и 8-bit шрифты.
+
+Аватарки (PFP) игроков генерировались через **Nano Banano** — у каждого ранга своя уникальная пиксельная иллюстрация персонажа, от бронзового мечника до легендарного дракона.
+
+## Геймификация
+
+- **ELO-рейтинг** — система рейтинга как в шахматах. Побеждай сильных — расти быстрее.
+- **Таблица лидеров** — глобальный рейтинг игроков с тирами (Bronze → Silver → Gold → Platinum → Diamond → Legendary).
+- **Ранговые матчи** — специальный режим, где каждая игра влияет на рейтинг.
+- **Матчмейкинг** — поиск соперника близкого уровня в очереди.
+- **Таймер на задачу** — 1, 3, 5 минуты, потом ход пропущен. Думай реще ахахах.
+
+## Монетизация
+
+Проект монетизируется через **Pro подписку** ([Polar.sh](http://Polar.sh)):
+
+| Функция            | Free | Pro |
+| ------------------ | ---- | --- |
+| Обычные игры       | ✅   | ✅  |
+| Задачи Easy/Medium | ✅   | ✅  |
+| Задачи Hard        | ❌   | ✅  |
+| Ранговый режим     | ❌   | ✅  |
+| Матчмейкинг        | ❌   | ✅  |
+
+Pro подписка открывает к бесконечным созданием игр, тайм контроль, выбор ЯП (питон или джаваскрипт) и задачи категории Middle & Hard. Оплата через [Polar.sh](http://Polar.sh), статус подписки хранится в Supabase.
+
+## Стек
+
+- **Next.js** (App Router) + TypeScript
+- **Supabase** — авторизация, база данных, Realtime
+- **Pyodide** — запуск Python прямо в браузере
+- **Polar.sh** — Pro подписка, используйте промокод nfactorial чтобы получить 100% скидку на про план.
+- **react-chessboard** + кастомные пиксельные фигуры
+
+## Запуск локально
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Открой [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Создай `.env.local` с ключами Supabase и Polar (см. `.env.example`).
